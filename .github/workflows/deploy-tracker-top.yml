@@ -1,0 +1,32 @@
+name: release check tracker-top
+
+# Хук проверки релиза: после сборки образа ждём, пока Semaphore/ручной деплой
+# выкатит его на es, и подтверждаем здоровье + ревизию. Деплой по SSH —
+# с машин юзера (ansible/semaphore ходят на es напрямую), секретов не нужно.
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [docker]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  healthz:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check (release hook)
+        run: |
+          # даём деплою время выехать (semaphore/ручной)
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            body=$(curl -s --max-time 15 https://top.0x3654.com/healthz || true)
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://top.0x3654.com/healthz || true)
+            echo "try $i: HTTP $code $body"
+            [ "$code" = "200" ] && exit 0
+            sleep 30
+          done
+          echo "health check failed"
+          exit 1
+
+      - name: Report revision
+        run: curl -s --max-time 15 https://top.0x3654.com/healthz | python3 -c "import json,sys; d=json.load(sys.stdin); print('live rev:', d.get('rev'))"
