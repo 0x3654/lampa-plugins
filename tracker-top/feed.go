@@ -481,10 +481,20 @@ func buildPool(variant string) ([]map[string]any, error) {
 
 // rawTMDBPage — сырая страница TMDB без проверки раздач (мгновенно):
 // ответ /feed, пока пул собирается; карточки без качества/озвучки
+// rawTMDBPage — страница на время сборки пула: фильмы вселенной варианта,
+// сматченные по базе топов (мгновенно, из кэша) — на карточках только
+// реальные раздачи с плашками; фейки невышедших фильмов и прочее
+// нематченное не показывается вовсе. База недоступна — сырая страница
+// как раньше (лучше без плашек, чем пустой экран)
 func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool) ([]map[string]any, int, error) {
 	v, ok := tmdbVariants[variant]
 	if !ok {
 		return nil, 0, fmt.Errorf("unknown variant")
+	}
+
+	baseOK := true
+	if _, _, err := getTop("both", "video", 3, true, "", "1", "seeds", "0"); err != nil {
+		baseOK = false // база недоступна — отдаём сырое
 	}
 
 	var collected []map[string]any
@@ -507,6 +517,41 @@ func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool) ([]ma
 				if seen[idf] || (exclude != nil && exclude[int(idf)]) {
 					continue
 				}
+			}
+
+			if baseOK {
+				query, _ := el["title"].(string)
+				if query == "" {
+					query, _ = el["name"].(string)
+				}
+				orig, _ := el["original_title"].(string)
+				if orig == "" {
+					orig, _ = el["original_name"].(string)
+				}
+				date, _ := el["release_date"].(string)
+				if date == "" {
+					date, _ = el["first_air_date"].(string)
+				}
+				year := 0
+				if len(date) >= 4 {
+					year, _ = strconv.Atoi(date[:4])
+				}
+				typ := "movie"
+				if _, has := el["name"]; has {
+					typ = "tv"
+				}
+
+				it, found := findInTopBase(query, orig, year, typ)
+				if !found {
+					continue // нет реальной раздачи — на building-страницу не берём
+				}
+				el["quality"] = humanQuality(it.Quality)
+				if vv := humanVoice(it); vv != "" {
+					el["voice"] = vv
+				}
+			}
+
+			if idf, ok := el["id"].(float64); ok {
 				seen[idf] = true
 			}
 			collected = append(collected, el)
