@@ -29,7 +29,7 @@
     var TV      = 'https://plex.tv/api/v2' // облако Plex (CORS открыт — проверено)
     var WATCHED = 90                       // %, с которого считаем просмотренным
     var PAGE    = 500                      // страница обхода библиотеки
-    var SYNC_REV = 2                       // ревизия логики импорта: подняли —
+    var SYNC_REV = 3                       // ревизия логики импорта: подняли —
                                            // все устройства один раз тихо
                                            // досинхронятся при следующем старте
 
@@ -643,7 +643,7 @@
         function importAll(done){
             importing = true
 
-            var stat = { movies: 0, episodes: 0, seen: 0 }
+            var stat = { movies: 0, episodes: 0, seen: 0, viewed: 0, noguid: 0, cardFail: 0 }
             var movies = []  // {tmdb, viewed, offset, duration, viewedAt, fallbackTitle}
             var shows = []   // {tmdb, rk, fallbackTitle, eps: [...], lastAt}
             var historyAdd = []
@@ -671,7 +671,7 @@
                         walk(sec, sec.type === 'show' ? 2 : 1, function(items){
                             items.forEach(function(item){
                                 var guids = tmdbGuids(item)
-                                if(!guids.length) return
+                                if(!guids.length){ stat.noguid++; return }
 
                                 if(sec.type === 'movie'){
                                     var viewedAt = (parseInt(item.lastViewedAt, 10) || 0) * 1000
@@ -731,6 +731,7 @@
 
                         mapLimit(movies, 3, function(mv, nextM){
                             tmdbGet('movie', mv.tmdb, function(card){
+                                if(!card) stat.cardFail++
                                 var orig = card ? card.original_title : mv.fallbackTitle
                                 var hash = hashMovie(orig)
                                 var use  = movieCard(mv, card)
@@ -754,6 +755,7 @@
                         }, function(){
                             mapLimit(shows, 3, function(sv, nextS){
                                 tmdbGet('tv', sv.tmdb, function(card){
+                                    if(!card) stat.cardFail++
                                     // хеш серии — от original_name; fallback —
                                     // originalTitle из библиотеки (тоже оригинал)
                                     var orig = (card && card.original_name) || sv.fallbackTitle
@@ -814,6 +816,13 @@
                                 }
 
                                 importing = false
+
+                                stat.viewed = viewedAdd.length
+
+                                // итог последнего импорта — видно в строке
+                                // «Синхронизировать» (диагностика с конуса)
+                                try{ Lampa.Storage.set('plex_imp', { ts: Date.now(), stat: stat }) }catch(e){}
+
                                 done(null, stat)
                             })
                         })
@@ -990,10 +999,19 @@
             onRender: function(item){
                 var user = Lampa.Storage.get('plex_user', '')
                 var srv  = Lampa.Storage.get('plex_srv', '')
+                var txt  = token() ? ((user || 'ok') + (srv && srv.name ? ' · ' + srv.name : '')) : '—'
+                var imp  = Lampa.Storage.get('plex_imp', '')
 
-                item.find('.settings-param__descr').eq(0).text(
-                    token() ? ((user || 'ok') + (srv && srv.name ? ' · ' + srv.name : '')) : '—'
-                )
+                // итог последнего импорта: ф—фильмы, сер—эпизоды, гал—
+                // «Просмотрено», б/г—без tmdb-гайда, б/к—без карточки TMDB
+                if(imp && imp.stat){
+                    var s = imp.stat
+
+                    txt += ' · имп: ф' + s.movies + ' сер' + s.episodes + ' гал' + s.viewed +
+                        (s.noguid ? ' б/г' + s.noguid : '') + (s.cardFail ? ' б/к' + s.cardFail : '')
+                }
+
+                item.find('.settings-param__descr').eq(0).text(txt)
             },
             onChange: function(){
                 syncNow()
@@ -1086,8 +1104,13 @@
                 try{ rev = String(Lampa.Storage.get('plex_sync_rev', '')) }catch(e){}
 
                 if(rev !== String(SYNC_REV)){
-                    importAll(function(){
-                        try{ Lampa.Storage.set('plex_sync_rev', SYNC_REV) }catch(e){}
+                    importAll(function(err){
+                        // маркер только при успехе: сервер мигнул при обходе —
+                        // следующий старт попробует досинхронизацию снова
+                        if(!err){
+                            try{ Lampa.Storage.set('plex_sync_rev', SYNC_REV) }catch(e){}
+                        }
+
                         flushOutbox()
                     })
                 }

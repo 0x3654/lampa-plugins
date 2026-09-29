@@ -342,6 +342,11 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     const noTmdbUpd = calls.timelineUpdates.find(u => u.hash === lampaHash('Warfare'))
     assert.ok(noTmdbUpd && noTmdbUpd.percent === 100, 'таймлайн по fallback-названию из Plex')
 
+    // итог импорта — в хранилище (строка «Синхронизировать» его покажет)
+    assert.ok(state.storage.plex_imp && state.storage.plex_imp.stat, 'статистика импорта записана')
+    assert.strictEqual(state.storage.plex_imp.stat.viewed, 3, 'галок по итогам: 2 фильма + полностью просмотренное шоу')
+    assert.strictEqual(state.storage.plex_imp.stat.cardFail, 1, 'одна карточка TMDB не догрузилась — посчитана')
+
     assert.ok(calls.noty.some(n => n.text.includes('plex_sync_done')), 'итог импорта показан')
     console.log('✓ Plex→Lampa: таймлайн фильм+эпизоды (received, штампы) + «История» по свежести')
 }
@@ -448,14 +453,20 @@ console.log('✓ обёртка истории: нативный add(…,100) �
             { ratingKey: 10, viewCount: 1, lastViewedAt: 1750000000, duration: 7200000, originalTitle: 'Warfare', title: 'Под огнём', year: 2025, Guid: [{ id: 'tmdb://777' }] }
         ] } } } },
     ]
+    // первый запуск: тоннель мигнул (нет маршрутов) — импорт сорвался,
+    // маркер НЕ пишется, следующий старт попробует снова
+    const failed = boot(state.storage, state.fields, [])
+    assert.ok(!failed.s.storage.plex_sync_rev, 'сбой сервера — маркер не записан, будет ретрай')
+
     const first = boot(state.storage, state.fields, routes)
     assert.ok(first.c.xhr.some(x => x.url.includes('/library/sections/1/all')), 'фоновый импорт пошёл сам, без кнопки')
-    assert.strictEqual(String(first.s.storage.plex_sync_rev), '2', 'маркер ревизии записан')
+    assert.strictEqual(String(first.s.storage.plex_sync_rev), '3', 'маркер ревизии записан')
     assert.ok(first.c.favoriteAdds.some(f => f.type === 'viewed' && f.card.id === 777), 'галка доложилась (карточка из Plex)')
+    assert.ok(first.s.storage.plex_imp && first.s.storage.plex_imp.stat, 'статистика импорта записана и на фоне')
 
     const second = boot(first.s.storage, state.fields, routes)
     assert.ok(!second.c.xhr.some(x => x.url.includes('/library/sections/1/all')), 'следующий запуск — тихо, без обхода')
-    console.log('✓ досинхронизация в покое: один фоновый импорт после смены ревизии, дальше — тишина')
+    console.log('✓ досинхронизация в покое: сбой не съедает ретрай, успех — один импорт и тишина')
 }
 
 console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')
