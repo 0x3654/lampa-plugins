@@ -129,7 +129,9 @@ until an account is linked.
 Matching is exact, by TMDB guids (`tmdb://id` — the Plex Movie/Series
 agents carry them). A local mark newer than the incoming one is never
 overwritten (LWW). With «Sync Watch State» enabled on the account, a mark
-on one server propagates to the others by itself.
+on one server propagates to the others by itself. The server address
+defaults to the ru2 tunnel (`http://ru2.0x3654.com:32400`) — clear the
+field to let the account's own server list pick the address.
 
 ## t.js bootstrap
 
@@ -394,7 +396,9 @@ Bundle id любого приложения: `osascript -e 'id of app "Имя"'`
 Матчинг точный, по TMDB-гуидам (`tmdb://id` — их несут агенты Plex
 Movie/Series). Локальная отметка новее входящей не затирается (LWW). С
 включённым «Sync Watch State» у аккаунта отметка на одном сервере сама
-разъедется по остальным.
+разъедется по остальным. Адрес сервера по умолчанию — тоннель на ru2
+(`http://ru2.0x3654.com:32400`); очистите поле — плагин возьмёт адрес
+из списка серверов аккаунта.
 
 ## t.js — бутстрап
 

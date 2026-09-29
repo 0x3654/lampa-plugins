@@ -66,7 +66,7 @@ sandbox.appready = true
 // минимальный фейк jQuery для модалки привязки (код + таймер)
 sandbox.$ = function(html){
     const el = { codeShown: '', timerShown: '' }
-    el.find = (sel) => ({ text: (t) => { if(sel === '.plex-pin-code') el.codeShown = t } })
+    el.find = (sel) => ({ text: (t) => { if(sel === '.plex-pin-code'){ el.codeShown = t; state.pinShown = t } } })
     return el
 }
 sandbox.Lampa = {
@@ -116,13 +116,15 @@ assert.deepStrictEqual(calls.params.map(p => p.param.name),
 for(const p of calls.params){
     if(p.param.type === 'input') assert.strictEqual(p.param.values, 'string', 'input обязан иметь values:string')
 }
-console.log('✓ регистрация: раздел «Plex», 6 параметров, input с маркером')
+assert.strictEqual(param('plex_manual_url').param.default, 'http://ru2.0x3654.com:32400',
+    'адрес сервера по умолчанию — тоннель ru2')
+console.log('✓ регистрация: раздел «Plex», 6 параметров, input с маркером, дефолт адреса — тоннель ru2')
 
 // --- 2. PIN-привязка: модалка с кодом → поллинг ловит authToken → токен сохранён, синк стартует
 {
     let pinPolls = 0
 
-    route((url) => url.includes('/api/v2/pins?'), { status: 201, json: { id: 12345, code: 'ABCD' } })
+    route((url, method) => method === 'POST' && url.includes('/api/v2/pins'), { status: 201, json: { id: 12345, code: 'DWZX', expiresIn: 900 } })
     route((url) => url.includes('/pins/12345'), {
         status: 200,
         json: { get authToken(){ return ++pinPolls > 1 ? 'TOKEN-1' : '' } }
@@ -137,13 +139,15 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     tick() // первый поллинг: authToken пуст
     tick() // второй: authToken выдан
 
+    assert.strictEqual(state.pinShown, 'DWZX', 'код показан в модалке')
     assert.strictEqual(state.storage.plex_token_save, 'TOKEN-1', 'токен сохранён')
     assert.strictEqual(state.storage.plex_user, 'userx', 'имя аккаунта сохранено')
     assert.ok(calls.noty.some(n => n.text === 'plex_linked: userx'), 'нотификация о привязке')
     assert.ok(calls.noty.some(n => n.text === 'plex_no_server'), 'авто-синк после привязки стартовал (сервера нет — честная ошибка)')
-    assert.ok(calls.xhr.some(x => x.method === 'POST' && x.url.includes('strong=true')), 'PIN создан POST со strong')
+    const pinPost = calls.xhr.find(x => x.method === 'POST' && x.url.includes('/api/v2/pins'))
+    assert.ok(pinPost && !/strong/.test(pinPost.url), 'PIN без strong — короткий код, какой принимает plex.tv/link')
     assert.ok(calls.xhr.every(x => x.headers['x-plex-client-identifier']), 'Client-Identifier на запросах к plex.tv')
-    console.log('✓ PIN: модалка → код ABCD → поллинг → токен сохранён → авто-синк')
+    console.log('✓ PIN: модалка → 4-символьный код (без strong) → поллинг → токен сохранён → авто-синк')
 }
 
 // --- 3. сквозной Lampa→Plex: детект по ручному адресу, прогресс/скроббл/анскроббл

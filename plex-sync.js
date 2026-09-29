@@ -65,7 +65,7 @@
             plex_linked:             { ru: 'Plex: аккаунт привязан',      en: 'Plex: account linked' },
             plex_no_server:          { ru: 'Plex: сервер недоступен',     en: 'Plex: server unreachable' },
             plex_manual_url:         { ru: 'Адрес сервера (пусто — авто)', en: 'Server address (empty = auto)' },
-            plex_manual_url_descr:   { ru: 'например, http://192.168.1.2:32400; авто — адрес сервера аккаунта (LAN первым)', en: 'e.g. http://192.168.1.2:32400; auto = account server address' },
+            plex_manual_url_descr:   { ru: 'по умолчанию — наш тоннель (ru2); очистите — авто: адрес сервера аккаунта (LAN первым)', en: 'defaults to our tunnel (ru2); clear it for auto = account server address (LAN first)' },
             plex_token_manual:       { ru: 'Токен X-Plex-Token (вручную)', en: 'X-Plex-Token (manual)' },
             plex_token_manual_descr: { ru: 'запасной способ привязки вместо кода', en: 'fallback linking method instead of the code' },
             plex_scrobble:           { ru: 'Отмечать просмотр в Plex',    en: 'Scrobble watching to Plex' },
@@ -192,8 +192,10 @@
             server = null // сервер определять заново
         }
 
+        // без strong: plex.tv/link принимает 4-символьный код (strong
+        // выдаёт длинный — на /link его не ввести)
         function pinCreate(cb){
-            xhr('POST', TV + '/pins?' + qs({ strong: true }), tvHeaders(false), function(j){
+            xhr('POST', TV + '/pins', tvHeaders(false), function(j){
                 cb(j || null)
             }, function(){ cb(null) })
         }
@@ -746,10 +748,16 @@
 
         //---------- привязка аккаунта (код plex.tv/link)
 
+        // plex.tv отдаёт длинный код без разделителей — режем по 4
+        // символа, чтобы читался с дивана и влезал в модалку
+        function formatCode(code){
+            return String(code || '').replace(/(.{4})/g, '$1 ').trim()
+        }
+
         function linkAccount(){
             var box = $(
                 '<div class="about" style="text-align:center">' +
-                    '<div class="plex-pin-code" style="font-size:2.2em;letter-spacing:.25em;font-weight:300">— — — —</div>' +
+                    '<div class="plex-pin-code" style="font-size:1.8em;letter-spacing:.25em;font-weight:300;word-break:break-word;padding:0 .6em">— — — —</div>' +
                     '<div style="margin-top:1.4em;opacity:.8">' + T('code_enter') + '</div>' +
                     '<div style="margin-top:1.4em;opacity:.4" class="plex-pin-timer"></div>' +
                 '</div>'
@@ -783,7 +791,10 @@
                     return Lampa.Noty.show(T('no_server'), { style: 'error', time: 6000 })
                 }
 
-                box.find('.plex-pin-code').text(pin.code)
+                box.find('.plex-pin-code').text(formatCode(pin.code))
+
+                left = (pin.expiresIn && parseInt(pin.expiresIn, 10)) || 900
+
                 countdown()
 
                 timer = setInterval(function(){
@@ -922,8 +933,8 @@
                 name: 'plex_manual_url',
                 type: 'input',
                 values: 'string',
-                default: '',
-                placeholder: 'http://192.168.1.2:32400'
+                default: 'http://ru2.0x3654.com:32400',
+                placeholder: 'http://ru2.0x3654.com:32400'
             },
             field: {
                 name: T('manual_url'),
