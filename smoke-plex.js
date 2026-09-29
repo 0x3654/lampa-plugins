@@ -329,4 +329,25 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     console.log('✓ формула хеша эпизода совпадает с Timeline Lampa')
 }
 
+// --- 8. миграция старых адресов тоннеля (:32400, http/https) на текущий /plex
+{
+    state.xhrRoutes.length = 0
+
+    // перепривязка токеном: saveToken обнуляет кэш сервера из блока 3
+    state.fields.plex_token_manual = 'TOKEN-2'
+    route((url) => url.includes('/api/v2/user') && !url.includes('/pins'), { status: 200, json: { username: 'userx' } })
+    param('plex_token_manual').onChange()
+
+    state.fields.plex_manual_url = 'https://ru2.0x3654.com:32400' // самодельный фикс mixed content: на 32400 нет TLS
+    route((url) => url.includes('ru2.0x3654.com/plex/identity'), { status: 200, json: { MediaContainer: {} } })
+
+    param('plex_sync_now').onChange()
+
+    assert.strictEqual(state.storage.plex_manual_url, 'https://ru2.0x3654.com/plex',
+        'старый адрес с портом мигрирован и сохранён в настройку')
+    assert.ok(calls.xhr.some(x => x.url.includes('ru2.0x3654.com/plex/identity')),
+        'probe пошёл на текущий https-адрес')
+    console.log('✓ миграция старых адресов тоннеля → https://ru2.0x3654.com/plex')
+}
+
 console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')

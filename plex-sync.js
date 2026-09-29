@@ -219,6 +219,15 @@
         function manualUrl(){
             var url = (Lampa.Storage.field('plex_manual_url') || '').trim()
 
+            // прежние варианты адреса тоннеля (http с портом — первый дефолт;
+            // https с портом — самодельный фикс mixed content: на 32400 нет
+            // TLS, браузер ругается на серт) мигрируем на текущий https
+            if(url === 'http://ru2.0x3654.com:32400' || url === 'https://ru2.0x3654.com:32400'){
+                url = 'https://ru2.0x3654.com/plex'
+
+                try{ Lampa.Storage.set('plex_manual_url', url) }catch(e){}
+            }
+
             if(url){
                 if(!/^https?:\/\//i.test(url)) url = 'http://' + url
                 url = url.replace(/\/+$/, '')
