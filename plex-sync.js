@@ -644,6 +644,8 @@
             var movies = []  // {tmdb, viewed, offset, duration, viewedAt, fallbackTitle}
             var shows = []   // {tmdb, rk, fallbackTitle, eps: [...], lastAt}
             var historyAdd = []
+            var viewedAdd = [] // «Просмотрено»: галки и скрытие просмотренного,
+                               // не зависит от лимита «Истории» (100)
 
             detectServer(function(srv){
                 if(!srv){
@@ -717,6 +719,7 @@
                                 }
 
                                 if(card && mv.viewedAt) historyAdd.push({ card: card, viewedAt: mv.viewedAt })
+                                if(card && mv.viewed) viewedAdd.push({ card: card })
 
                                 nextM()
                             })
@@ -730,11 +733,16 @@
                                     if(!orig) return nextS() // без имени не посчитать хеш серии
 
                                     pms('GET', '/library/metadata/' + sv.rk + '/allLeaves', { includeGuids: 1 }, function(json){
-                                        ((((json || {}).MediaContainer || {}).Metadata) || []).forEach(function(m){
+                                        var leaves = ((((json || {}).MediaContainer || {}).Metadata) || [])
+                                        var full = leaves.length > 0 // все эпизоды библиотеки просмотрены
+
+                                        leaves.forEach(function(m){
                                             var viewed = parseInt(m.viewCount, 10) > 0
                                             var offset = (parseInt(m.viewOffset, 10) || 0) / 1000
                                             var vd     = (parseInt(m.lastViewedAt, 10) || 0) * 1000
                                             var epDur  = (parseInt(m.duration, 10) || 0) / 1000
+
+                                            if(!viewed) full = false
 
                                             if(!viewed && !offset) return
 
@@ -757,6 +765,7 @@
                                         })
 
                                         if(card && sv.lastAt) historyAdd.push({ card: card, viewedAt: sv.lastAt })
+                                        if(card && full) viewedAdd.push({ card: card })
 
                                         nextS()
                                     }, function(){ nextS() })
@@ -768,6 +777,10 @@
                                 if(canHistory()){
                                     historyAdd.forEach(function(h){
                                         try{ Lampa.Favorite.add('history', h.card, 100) }catch(e){}
+                                    })
+
+                                    viewedAdd.forEach(function(v){
+                                        try{ Lampa.Favorite.add('viewed', v.card) }catch(e){}
                                     })
                                 }
 

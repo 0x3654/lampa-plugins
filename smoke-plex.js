@@ -264,8 +264,9 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     // tmdb://<id эпизода>, у шоу — tmdb://<id шоу>), эпизоды — allLeaves
     route((url) => url.includes('/library/sections/2/all') && !url.includes('guid='), {
         status: 200,
-        json: { MediaContainer: { totalSize: 1, Metadata: [
-            { ratingKey: 900, title: 'Сериал', originalTitle: 'Show Name', Guid: [{ id: 'tmdb://500' }] }
+        json: { MediaContainer: { totalSize: 2, Metadata: [
+            { ratingKey: 900, title: 'Сериал', originalTitle: 'Show Name', Guid: [{ id: 'tmdb://500' }] },
+            { ratingKey: 910, title: 'Полный', originalTitle: 'Full Show', Guid: [{ id: 'tmdb://501' }] }
         ] } }
     })
     route((url) => url.includes('/library/metadata/900/allLeaves'), {
@@ -276,9 +277,16 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
             { ratingKey: 903, parentIndex: 11, index: 2, viewCount: 0, viewOffset: 600000, lastViewedAt: 1750000200, duration: 2700000 } // частично: 600с из 2700с
         ] } }
     })
+    route((url) => url.includes('/library/metadata/910/allLeaves'), {
+        status: 200,
+        json: { MediaContainer: { Metadata: [
+            { ratingKey: 911, parentIndex: 1, index: 1, viewCount: 1, lastViewedAt: 1750000300, duration: 2700000 }
+        ] } }
+    })
     route((url) => url.includes('/:/progress'), { status: 200, json: {} })
     state.tmdb['movie/100'] = { id: 100, title: 'Холоп', original_title: 'Kholop', release_date: '2026-01-01' }
     state.tmdb['tv/500'] = { id: 500, name: 'Сериал', original_name: 'Show Name', first_air_date: '2026-01-01' }
+    state.tmdb['tv/501'] = { id: 501, name: 'Полный', original_name: 'Full Show', first_air_date: '2026-01-01' }
 
     param('plex_sync_now').onChange()
 
@@ -299,11 +307,19 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     assert.ok(epPart, 'таймлайн эпизода s11e02 (сезон>10: с двоеточием)')
     assert.strictEqual(epPart.percent, 22, 'частичный: 600с/2700с → 22%')
 
-    // история: фильм и шоу, свежие первыми (шоу 1750000100 > фильма 1750000000)
-    assert.ok(calls.favoriteAdds.some(f => f.type === 'history' && f.card.id === 100), 'фильм в «Историю»')
-    assert.ok(calls.favoriteAdds.some(f => f.type === 'history' && f.card.id === 500), 'шоу в «Историю»')
-    assert.ok(calls.favoriteAdds.every(f => f.limit === 100))
-    assert.strictEqual(calls.favoriteAdds[calls.favoriteAdds.length - 2].card.id, 500, 'свежее (шоу) — первым')
+    // история: фильм и оба шоу, свежие первыми (910 → 1750000300 максимум)
+    const histAdds = calls.favoriteAdds.filter(f => f.type === 'history')
+    assert.ok(histAdds.some(f => f.card.id === 100), 'фильм в «Историю»')
+    assert.ok(histAdds.some(f => f.card.id === 500) && histAdds.some(f => f.card.id === 501), 'оба шоу в «Историю»')
+    assert.ok(histAdds.every(f => f.limit === 100))
+    assert.strictEqual(histAdds[0].card.id, 501, 'самое свежее шоу — первым в истории')
+
+    // «Просмотрено» (галки + скрытие, без лимита истории): просмотренный
+    // фильм и полностью просмотренное шоу; шоу с частичной серией — нет
+    const viewedAdds = calls.favoriteAdds.filter(f => f.type === 'viewed')
+    assert.ok(viewedAdds.some(f => f.card.id === 100), 'просмотренный фильм — в «Просмотрено»')
+    assert.ok(viewedAdds.some(f => f.card.id === 501), 'полностью просмотренное шоу — в «Просмотрено»')
+    assert.ok(!viewedAdds.some(f => f.card.id === 500), 'шоу с недосмотренной серией — НЕ в «Просмотрено»')
 
     assert.ok(calls.noty.some(n => n.text.includes('plex_sync_done')), 'итог импорта показан')
     console.log('✓ Plex→Lampa: таймлайн фильм+эпизоды (received, штампы) + «История» по свежести')
