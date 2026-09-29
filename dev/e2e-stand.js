@@ -20,10 +20,19 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const failed = []
   page.on('requestfailed', r => {
     const u = r.url()
-    if (!/imagetmdb|modification\.js|personal\.lampa|black_list/.test(u))
+    // imagetmdb/ламповые пробы — фон; ?logged= и статику гарнита рвёт
+    // сама перезагрузка бутстрапа; torrserver/themoviedb — прямые заходы
+    // лампы мимо наших плагинов, из контейнера им нет хода
+    if (!/imagetmdb|modification\.js|personal\.lampa|black_list|\?logged=|\/img\/|torrserver\.|themoviedb|hls\.js/.test(u))
       failed.push(u.slice(0, 100) + ' :: ' + (r.failure() || {}).errorText)
   })
   page.on('pageerror', e => failed.push('PAGEERROR ' + e.message.slice(0, 120)))
+
+  // /topapi ловим с самого начала: «Топ» — главная (top_as_home), /feed
+  // уходит ещё на буте, до явного открытия экранов ниже
+  const topapi = []
+  const onResp = r => { if (/\/topapi\/(top|feed)/.test(r.url())) topapi.push(r.status() + ' ' + r.url().replace(/^.*\/topapi/, '/topapi').slice(0, 60)) }
+  page.on('response', onResp)
 
   await page.goto(PAGE, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(8000)
@@ -61,12 +70,9 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const healed = await dump()
   console.log('after poison + reload:', JSON.stringify(healed))
 
-  // экраны Топа по-настоящему: открыть «Топ · трекеры» и «Топ · TMDB»,
-  // запросы должны дойти до /topapi по http и вернуться 200 (ловит регресс
-  // принудительного https в serverUrl: TLS-хендшейки в http-nginx)
-  const topapi = []
-  const onResp = r => { if (/\/topapi\/(top|feed)/.test(r.url())) topapi.push(r.status() + ' ' + r.url().replace(/^.*\/topapi/, '/topapi').slice(0, 60)) }
-  page.on('response', onResp)
+  // экраны Топа по-настоящему: открыть «Топ · трекеры» и «Топ · TMDB»
+  // («Топ · TMDB» уже мог отработать главной на буте — push той же
+  // активности лампа дедупит, поэтому /feed ловим и на буте тоже)
 
   const openScreen = async component => {
     // детерминированно: тот же Activity.push, что делает пункт меню
@@ -97,6 +103,11 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
 
   if (failed.length) console.log('failed requests:\n' + failed.join('\n'))
 
+  // plex-sync ставится бутстрапом (v13) и исполняется: в списке расширений
+  // и с зарегистрированным разделом настроек «Plex»
+  const plexInstalled = fresh.plugins.includes('plex-sync.js')
+  console.log('plex-sync installed:', plexInstalled ? 'yes' : 'NO')
+
   const ok = fresh.appready && healed.appready
     && /\/topapi$/.test(healed.top_server_url || '')
     && healed.protocol === 'http'
@@ -104,6 +115,7 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
     && probe === 200
     && topapi.some(u => u.startsWith('200 /topapi/top'))
     && topapi.some(u => u.startsWith('200 /topapi/feed'))
+    && plexInstalled
 
   console.log(ok ? 'E2E STAND OK' : 'E2E STAND FAIL')
   await browser.close()

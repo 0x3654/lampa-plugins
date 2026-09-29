@@ -30,7 +30,7 @@
   localhost Safari режет как local network (status 0 «нет сети»); маунтится
   ТОЛЬКО каталог вебрута (одиночные bind-mount файлов цепляют старый inode —
   правки не подхватываются), плагины синхронизируются копированием после
-  каждой правки: `cp top.js transmission-send.js t.js ~/code/lampa/`; в
+  каждой правки: `cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/`; в
   index.html вебрута дев-хук `window.TJS_DEV = true` + загрузчик локального
   /t.js — бутстрап ставит плагины с того же origin, себя (виден в
   Расширениях) и ведёт топ-сервер на same-origin `/topapi` (в dev — на

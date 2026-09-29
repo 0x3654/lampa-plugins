@@ -41,7 +41,8 @@
     window[FLAG] = true
 
     // поднять после правки CONFIG — настройки применятся заново
-    var VERSION = '12'
+    // v13: в списке плагинов plex-sync
+    var VERSION = '13'
 
     // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
     // true — оба адреса выводятся из адреса страницы: плагины с того же
@@ -74,8 +75,9 @@
             // (возвращает «Парсер»/«TorrServer» в сторовских сборках)
             { url: 'http://cub.red/plugin/etor', status: 1 },
             // прокси TMDB через cub (устойчивость к блокировкам)
-            { url: 'http://cub.red/plugin/tmdb-proxy', status: 1 }
-            // { url: 'https://0x3654.github.io/lampa-plugins/plex-sync.js', status: 1 }
+            { url: 'http://cub.red/plugin/tmdb-proxy', status: 1 },
+            // Plex Sync — статус просмотра Lampa ↔ аккаунт Plex
+            { url: BASE + '/plex-sync.js', status: 1 }
         ],
 
         // вычищенные плагины: убрать из списка устройств, если остались

@@ -22,6 +22,7 @@ PWA is separate from the Safari tab):
 |---|---|
 | Top | `https://0x3654.github.io/lampa-plugins/top.js` |
 | Torrent Send | `https://0x3654.github.io/lampa-plugins/transmission-send.js` |
+| Plex Sync | `https://0x3654.github.io/lampa-plugins/plex-sync.js` |
 | everything at once | `https://0x3654.github.io/t.js` (bootstrap, see below) |
 
 ## Top
@@ -113,6 +114,23 @@ Authorization: JSON login → token (cached per server+login), then
 `Authorization: Bearer`; on 401 (a password change rotates the token) it
 re-logins and retries once.
 
+## Plex Sync
+
+Two-way watch status with a Plex account (Settings → Plex). Linking is a
+plex.tv/link code (or a manual X-Plex-Token); the account's server is
+detected automatically, a manual LAN address is optional. Nothing is sent
+until an account is linked.
+
+| Direction | What happens |
+|---|---|
+| Lampa → Plex | finished (≥ 90%) — scrobble on the server; partial — playback position; unmarked — unscrobble |
+| Plex → Lampa | «Sync now» pulls watched items and positions into the Lampa timeline (progress on cards) and «Viewing history» |
+
+Matching is exact, by TMDB guids (`tmdb://id` — the Plex Movie/Series
+agents carry them). A local mark newer than the incoming one is never
+overwritten (LWW). With «Sync Watch State» enabled on the account, a mark
+on one server propagates to the others by itself.
+
 ## t.js bootstrap
 
 One short URL for a fresh Lampa install: adds the plugins above (plus the etor
@@ -180,7 +198,7 @@ docker run -d --name lampa-dev -p 8098:80 \
 
 # sync plugin edits into the webroot (after every edit; single-file bind
 # mounts would pin the old inode and serve stale code):
-cp top.js transmission-send.js t.js ~/code/lampa/
+cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
 ```
 
 Optional: route the tracker-top container's outbound traffic (Jackett
@@ -268,6 +286,7 @@ settings `Lampa.SettingsApi`.
 |---|---|
 | Top | `https://0x3654.github.io/lampa-plugins/top.js` |
 | Torrent Send | `https://0x3654.github.io/lampa-plugins/transmission-send.js` |
+| Plex Sync | `https://0x3654.github.io/lampa-plugins/plex-sync.js` |
 | всё сразу | `https://0x3654.github.io/t.js` (бутстрап, см. ниже) |
 
 ## Top — «адекватный топ» вместо ленты
@@ -360,6 +379,23 @@ Bundle id любого приложения: `osascript -e 'id of app "Имя"'`
 `Authorization: Bearer`; при 401 (смена пароля ротирует токен) — перелогин и
 один повтор.
 
+## Plex Sync — статус просмотра
+
+Двусторонний статус просмотра с аккаунтом Plex (Настройки → Plex).
+Привязка — кодом plex.tv/link (или ручным X-Plex-Token); сервер аккаунта
+определяется сам, ручной LAN-адрес — опционально. До привязки аккаунта
+ничего не отправляется.
+
+| Направление | Что происходит |
+|---|---|
+| Lampa → Plex | досмотрели (≥ 90%) — scrobble на сервере; частичный просмотр — позиция; сняли отметку — unscrobble |
+| Plex → Lampa | «Синхронизировать» переносит просмотренное и позиции в таймлайн Lampa (прогресс на карточках) и «Историю просмотров» |
+
+Матчинг точный, по TMDB-гуидам (`tmdb://id` — их несут агенты Plex
+Movie/Series). Локальная отметка новее входящей не затирается (LWW). С
+включённым «Sync Watch State» у аккаунта отметка на одном сервере сама
+разъедется по остальным.
+
 ## t.js — бутстрап
 
 Один короткий URL для чистой установки Lampa: ставит плагины выше (плюс etor
@@ -426,7 +462,7 @@ docker run -d --name lampa-dev -p 8098:80 \
 
 # синхронизация правок плагинов в вебрут (после каждой правки; одиночные
 # bind-mount файлов цепляют старый inode и отдавали бы устаревший код):
-cp top.js transmission-send.js t.js ~/code/lampa/
+cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
 ```
 
 Опционально: вывод исходящего трафика tracker-top (Jackett-прокси, трекеры,
