@@ -137,8 +137,9 @@ var (
 	nnmSubRe = regexp.MustCompile(`(?i)\[[^\]]*\bSub\b[^\]]*\]`)
 	// плохой звук: «звук с TS» — дорожка записана с экрана камрип-сеанса
 	tsRe = regexp.MustCompile(`(?i)звук с\s?ts`)
-	// камрип: плохая картинка — CAMRip, TS/TeleSync, TC, SCR, «зрительный зал»
-	camRe = regexp.MustCompile(`(?i)\b(cam|ts|tc|hdts|telesync|telecine|scr|tsrip|hdts)\b|\bts-?rip\b|camrip|зрительный зал`)
+	// камрип: плохая картинка — CAMRip, TS/TeleSync (вкл. написание TeleSynch),
+	// TC, SCR, «зрительный зал»
+	camRe = regexp.MustCompile(`(?i)\b(cam|ts|tc|hdts|telesync|telesynch|telecine|scr|tsrip|hdts)\b|\bts-?rip\b|camrip|зрительный зал`)
 	// студии озвучки: известный список + универсальный шаблон NNM «от <Студия>»
 	// (ExKinoRay, ELEKTRI4KA, Files-x, DoMiNo и сотни других) — выцепляем любой
 	voiceRe = regexp.MustCompile(`(?i)(LostFilm|Кубик в Кубе|NewStudio|Jaskier|Red ?Head Sound|` +

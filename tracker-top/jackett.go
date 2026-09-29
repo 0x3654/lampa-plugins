@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,6 +21,26 @@ const jackettBase = "https://jac.red"
 const jackettKey = "1"
 
 var jackettClient = &http.Client{Timeout: 25 * time.Second}
+
+// дробилка на 429: публичный прокси банит пачками — после одного 429
+// минуту не ходим (найдёт фолбэк/кэш), вместо десятков заведомо мёртвых
+// запросов при сборке пулов
+var (
+	jackett429Mu sync.Mutex
+	jackett429To time.Time
+)
+
+func jackettCooldown() bool {
+	jackett429Mu.Lock()
+	defer jackett429Mu.Unlock()
+	return time.Now().Before(jackett429To)
+}
+
+func jackettBanned() {
+	jackett429Mu.Lock()
+	jackett429To = time.Now().Add(time.Minute)
+	jackett429Mu.Unlock()
+}
 
 // год и русское название из Title Jackett
 var (
@@ -37,6 +58,9 @@ func jackettFind(query, orig string) []Item {
 			continue
 		}
 		seen["q:"+q] = true
+		if jackettCooldown() {
+			return out
+		}
 
 		u := fmt.Sprintf("%s/api/v2.0/indexers/all/results?apikey=%s&query=%s",
 			jackettBase, jackettKey, url.QueryEscape(q))
@@ -51,6 +75,12 @@ func jackettFind(query, orig string) []Item {
 		if err != nil {
 			log.Printf("jackett: %v", err)
 			continue
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			jackettBanned()
+			log.Printf("jackett: 429 — минутный отбой")
+			return out
 		}
 		body := json.NewDecoder(resp.Body)
 		var data struct {

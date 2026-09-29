@@ -199,6 +199,7 @@ func TestCamAndJunk(t *testing.T) {
 		"Фильм (2026) TS":                   true,
 		"Фильм (2026) CAMRip":               true,
 		"Фильм (2026) TeleSync":             true,
+		"Фильм (2026) TeleSynch":            true,
 		"Фильм (2026) WEB-DL 1080p":         false,
 		"Фильм (2026) WEBRip [H.264/1080p]": false,
 		"Фильм (2026) BDRip":                false,

@@ -9,6 +9,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -22,7 +23,7 @@ import (
 	"time"
 )
 
-const cacheVer = "v12" // версия логики фильтров: смена инвалидирует кэш на томе
+const cacheVer = "v13" // версия логики фильтров: смена инвалидирует кэш на томе
 
 var (
 	nnmBase   = env("NNM_BASE", "https://nnmclub.to")
@@ -526,7 +527,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 // warmCache — фоновый прогрев ходовых ключей: первый запрос пользователя
 // не должен ждать холодную сборку (она занимает десятки секунд)
 var (
-	warmVariants = []string{"movie_week", "tv_week", "movie_30", "movie_day", "tv_30", "movie_best", "tv_best", "movie_14", "tv_day", "movie_2025", "tv_2025"}
+	warmVariants = []string{"movie_week", "tv_week", "movie_best", "tv_best", "movie_2025", "tv_2025"}
 	warmIdx      = 0
 )
 
@@ -549,8 +550,8 @@ func warmCache() {
 			}
 		}
 		// пулы «Топ · TMDB»: обновление 2 раза в день
-		for _, v := range warmVariants[:3] { // ходовые: movie_week, tv_week, movie_30
-			if _, err := getPool(v); err != nil {
+		for _, v := range warmVariants[:3] { // ходовые: movie_week, tv_week, movie_best
+			if _, err := getPool(v); err != nil && !errors.Is(err, errPoolBuilding) {
 				log.Printf("warm pool %s: %v", v, err)
 			}
 		}
@@ -697,8 +698,23 @@ func main() {
 
 		// пул 100 фильмов (обновляется 2 раза в день): страница с любым
 		// exclude юзера нарезается мгновенно; фолбэк — прямая сборка
-		results, total, err := poolPage(variant, page, feedSize, exclude)
-		if err != nil || (page == 1 && len(results) < feedSize) {
+		results, total, err := poolPage(variant, page, feedSize, exclude,
+			param(q, "minq", ""), param(q, "voice", ""))
+		if errors.Is(err, errPoolBuilding) {
+			// пул собирается прогревом — сырая страница TMDB мгновенно,
+			// качество/озвучка появятся следующим открытием
+			if raw, tot, rerr := rawTMDBPage(variant, page, feedSize, exclude); rerr == nil {
+				writeJSON(w, 200, map[string]any{
+					"page": page, "total_pages": tot, "results": raw, "building": true,
+				})
+				return
+			}
+		}
+		// досып — только когда страница ПУСТАЯ (или почти): пул варианта
+		// может быть короче slice после фильтров юзера (у трендов вселенная
+		// ~100), и требовать полных 100 — значит гнать медленную прямую
+		// сборку на каждый запрос с холодным кэшем комбинации фильтров
+		if err != nil || (page == 1 && len(results) < 20) {
 			// активный зритель исключил почти весь пул — досыпаем прямой
 			// сборкой глубже TMDB с тем же exclude
 			extra, total2, err2 := buildFeedCached(variant, page, feedSize*3,

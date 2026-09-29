@@ -66,7 +66,7 @@
             top_trackers_matched:  { ru: 'Совпало с TMDB:',        en: 'Matched on TMDB:' },
             top_settings_name:     { ru: 'Топ',                    en: 'Top' },
             top_settings_server:   { ru: 'Адрес сервера топа',     en: 'Top server address' },
-            top_settings_server_desc: { ru: 'tracker-top: https://… (см. репо); сейчас micro-tracker.tailnet.invalid', en: 'tracker-top: https://… (see repo)' },
+            top_settings_server_desc: { ru: 'tracker-top: https://top.0x3654.com', en: 'tracker-top: https://top.0x3654.com' },
             top_settings_as_home:  { ru: '«Топ» вместо главной',   en: 'Top as home screen' },
             top_settings_as_home_desc: { ru: 'при запуске открывается последний вариант «Топа»', en: 'open last used Top variant on start' },
             top_settings_min_quality: { ru: 'Мин. качество (трекеры)', en: 'Min quality (trackers)' },
@@ -99,17 +99,16 @@
         //---------- варианты «Топа» (TMDB)
 
         var VARIANTS = [
-            // key — идентификатор варианта на сервере (/feed?variant=)
+            // key — идентификатор варианта на сервере (/feed?variant=);
+            // три смысла × фильмы/сериалы: горячее сейчас (тренды недели),
+            // классика по рейтингу, широкий каталог свежего. День/неделя
+            // совпадали на 78%, окна 14/30 дней — подмножества трендов
+            // (100% пересечения) и почти пустые — убраны
             { title: 'Фильмы · за неделю',        key: 'movie_week',  method: 'trending/movie/week' },
-            { title: 'Фильмы · за день',          key: 'movie_day',   method: 'trending/movie/day' },
-            { title: 'Фильмы · топ 14 дней',      key: 'movie_14',    method: 'discover/movie', windowDays: 14, dateKey: 'primary_release_date', params: { sort_by: 'popularity.desc', 'vote_count.gte': 50 } },
-            { title: 'Фильмы · топ 30 дней',      key: 'movie_30',    method: 'discover/movie', windowDays: 30, dateKey: 'primary_release_date', params: { sort_by: 'popularity.desc', 'vote_count.gte': 50 } },
-            { title: 'Сериалы · за неделю',       key: 'tv_week',     method: 'trending/tv/week' },
-            { title: 'Сериалы · за день',         key: 'tv_day',      method: 'trending/tv/day' },
-            { title: 'Сериалы · топ 30 дней',     key: 'tv_30',       method: 'discover/tv',    windowDays: 30, dateKey: 'first_air_date', params: { sort_by: 'popularity.desc', 'vote_count.gte': 20 } },
             { title: 'Фильмы · лучшее',           key: 'movie_best',  method: 'discover/movie', params: { sort_by: 'vote_average.desc', 'vote_count.gte': 2000 } },
-            { title: 'Сериалы · лучшее',          key: 'tv_best',     method: 'discover/tv',    params: { sort_by: 'vote_average.desc', 'vote_count.gte': 1500 } },
             { title: 'Фильмы · новинки 2025+',    key: 'movie_2025',  method: 'discover/movie', params: { sort_by: 'popularity.desc', 'primary_release_date.gte': '2025-01-01', 'vote_count.gte': 100 } },
+            { title: 'Сериалы · за неделю',       key: 'tv_week',     method: 'trending/tv/week' },
+            { title: 'Сериалы · лучшее',          key: 'tv_best',     method: 'discover/tv',    params: { sort_by: 'vote_average.desc', 'vote_count.gte': 1500 } },
             { title: 'Сериалы · новинки 2025+',   key: 'tv_2025',     method: 'discover/tv',    params: { sort_by: 'popularity.desc', 'first_air_date.gte': '2025-01-01', 'vote_count.gte': 30 } }
         ]
 
@@ -527,10 +526,17 @@
         function serverUrl(){
             var url = (Lampa.Storage.field('top_server_url') || '').trim()
 
-            // сервер только https (http-порт закрыт, http-запрос умирает мгновенно):
+            // дев-контур: адрес с origin этой страницы (бутстрап TJS_DEV
+            // выводит его из адреса страницы) доверяем как есть — лампу
+            // открыли по http, https туда мёртв. Внешние адреса — только
+            // https (http-порт прода закрыт, http-запрос умирает мгновенно):
             // без схемы — достраиваем, чужую http- схему — принудительно чиним
-            if(url && !/^https?:\/\//i.test(url)) url = 'https://' + url
-            url = url.replace(/^http:\/\//i, 'https://')
+            var sameOrigin = url.indexOf(window.location.origin) === 0
+
+            if(url && !sameOrigin){
+                if(!/^https?:\/\//i.test(url)) url = 'https://' + url
+                url = url.replace(/^http:\/\//i, 'https://')
+            }
 
             return url.replace(/\/+$/, '')
         }
@@ -678,6 +684,7 @@
             var origAppend = comp.append.bind(comp)
             var shown = []
             var bodyEl = null
+            var decorated = 0
             var opts = opts || {}
             var qualityOf = opts.qualityOf || function(){ return '' }
             var watchedOf = opts.watchedOf || null
@@ -706,41 +713,58 @@
                 }
             }
 
-            comp.append = function(data, append){
-                var before = bodyEl && bodyEl.children ? bodyEl.children.length : 0
-
-                origAppend(data, append)
-
-                if(data && data.results) shown = shown.concat(data.results)
-
-                if(!bodyEl){
-                    try{
-                        if(comp.render && comp.render(true)){
-                            var html = comp.render(true)
-                            bodyEl = html.querySelector ? html.querySelector('.category-full') : null
-                        }
-                    }
-                    catch(e){}
-                }
+            // body появляется в html ПОСЛЕ append (build вставляет его туда
+            // следующим шагом) — ищем лениво, в живой DOM как фолбэк
+            function resolveBody(){
+                if(bodyEl) return bodyEl
 
                 try{
-                    if(bodyEl && bodyEl.children && data && data.results){
-                        for(var i = before; i < bodyEl.children.length; i++){
-                            var el = data.results[i - before]
-                            if(el) decorate(bodyEl.children[i], el)
-                        }
+                    if(comp.render && comp.render(true)){
+                        var html = comp.render(true)
+                        bodyEl = html.querySelector ? html.querySelector('.category-full') : null
                     }
+                }
+                catch(e){}
+
+                if(!bodyEl && typeof document !== 'undefined' && document.querySelector){
+                    try{ bodyEl = document.querySelector('.category-full') }catch(e){}
+                }
+
+                return bodyEl
+            }
+
+            function decoratePending(){
+                try{
+                    var b = resolveBody()
+                    if(!b || !b.children) return
+
+                    for(var i = decorated; i < b.children.length && i < shown.length; i++){
+                        decorate(b.children[i], shown[i])
+                    }
+                    decorated = Math.min(b.children.length, shown.length)
                 }
                 catch(e){}
             }
 
+            comp.append = function(data, append){
+                origAppend(data, append)
+
+                if(data && data.results) shown = shown.concat(data.results)
+
+                // экран монтируется после append — плашки вешаем отложенно,
+                // когда DOM собрался; повтор (350мс) страхует медленный монтаж
+                setTimeout(decoratePending, 0)
+                setTimeout(decoratePending, 350)
+            }
+
             // отложенная плачка качества (пришла фоном из find-ответа)
             comp.topQuality = function(id, text){
-                if(!bodyEl || !bodyEl.children || bodyEl.children.length !== shown.length) return
+                var b = resolveBody()
+                if(!b || !b.children || b.children.length !== shown.length) return
 
                 for(var i = 0; i < shown.length; i++){
                     if(shown[i].id === id){
-                        var view = bodyEl.children[i].querySelector ? bodyEl.children[i].querySelector('.card__view') : null
+                        var view = b.children[i].querySelector ? b.children[i].querySelector('.card__view') : null
                         if(view && !view.querySelector('.card__quality')) view.appendChild(qualityBadge(text))
                         return
                     }
@@ -749,7 +773,8 @@
 
             // удалить карточки с перечисленными id; true — что-то удалили
             comp.topRemoveIds = function(ids){
-                if(!bodyEl || !bodyEl.children || bodyEl.children.length !== shown.length){
+                var b = resolveBody()
+                if(!b || !b.children || b.children.length !== shown.length){
                     return false // DOM недоступен или разошёлся — честный fallback
                 }
 
@@ -757,11 +782,12 @@
 
                 for(var i = shown.length - 1; i >= 0; i--){
                     if(ids[shown[i].id]){
-                        bodyEl.removeChild(bodyEl.children[i])
+                        b.removeChild(b.children[i])
                         shown.splice(i, 1)
                         removed = true
                     }
                 }
+                if(removed) decorated = shown.length
 
                 return removed
             }
@@ -1127,7 +1153,7 @@
                 type: 'input',
                 values: 'string', // обязательный маркер для input в Lampa
                 default: '',
-                placeholder: 'https://micro-tracker.tailnet.invalid'
+                placeholder: 'https://top.0x3654.com'
             },
             field: {
                 name: T('settings_server'),

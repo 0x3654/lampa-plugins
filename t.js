@@ -43,12 +43,33 @@
     // поднять после правки CONFIG — настройки применятся заново
     var VERSION = '12'
 
+    // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
+    // true — оба адреса выводятся из адреса страницы: плагины с того же
+    // origin (nginx локального контура), tracker-top на :8355 того же
+    // хоста; явные значения перекрывают вывод. Прод (без TJS_DEV) —
+    // значения по умолчанию ниже
+    var dev = null
+
+    try{ dev = window.TJS_DEV }catch(e){}
+    if(dev === true) dev = {}
+
+    var BASE = 'https://0x3654.github.io/lampa-plugins'
+    var TOP  = 'https://top.0x3654.com'
+
+    if(dev){
+        // плагины — с того же origin; tracker-top — за nginx-прокси /topapi
+        // того же origin (кросс-портовые запросы Safari режет как local
+        // network: XHR падает с status 0 «нет подключения»)
+        BASE = dev.plugins || window.location.origin
+        TOP  = dev.top || (window.location.origin + '/topapi')
+    }
+
     var CONFIG = {
         // status: 1 — включён; 0 — установлен выключенным (в списке есть,
         // не исполняется; включается штатно в Настройки → Расширения)
         plugins: [
-            { url: 'https://0x3654.github.io/lampa-plugins/top.js', status: 1 },
-            { url: 'https://0x3654.github.io/lampa-plugins/transmission-send.js', status: 1 },
+            { url: BASE + '/top.js', status: 1 },
+            { url: BASE + '/transmission-send.js', status: 1 },
             // etor — «разблокировщик торрентов»: включает torrents_use
             // (возвращает «Парсер»/«TorrServer» в сторовских сборках)
             { url: 'http://cub.red/plugin/etor', status: 1 },
@@ -69,8 +90,8 @@
         ],
 
         storage: {
-            // сервер «Топа · трекеров» (tracker-top, публичный домен)
-            top_server_url: 'https://top.0x3654.com',
+            // сервер «Топа · трекеров» (tracker-top; в dev — TJS_DEV.top)
+            top_server_url: TOP,
 
             // TorrServer: основная — micro (tsdproxy), дополнительная —
             // встроенный TorrServer приложения (Apple TV/Android/macOS)
@@ -134,6 +155,11 @@
         menu_hide_names: ['Спорт', 'Sport', 'Shots']
     }
 
+    // dev: бутстрап устанавливает и себя — в Расширениях виден
+    // «Запуск — настройка лампы», как в проде (грузится хуком index.html
+    // при первом заходе, дальше исполняется как плагин)
+    if(dev) CONFIG.plugins.push({ url: BASE + '/t.js', status: 1 })
+
     // отвечает ли локальный TorrServer (встроенный в приложение)
     function probeLocal(cb){
         var tries = 2
@@ -189,6 +215,19 @@
 
     function init(){
         var Lampa = window.Lampa
+
+        // dev: топ-сервер всегда от этого origin (хранение могло сохранить
+        // прошлый вывод адреса — например, localhost:8355)
+        // dev: лампа строит URL через protocol() — Storage 'protocol' у
+        // свежей установки пуст и дефолтит в https://, и встроенные запросы
+        // с http-страницы уходят TLS-хендшейком в наш http-nginx (400
+        // «нет подключения») — форсим http
+        try{
+            if(dev){
+                if(TOP) Lampa.Storage.set('top_server_url', TOP)
+                Lampa.Storage.set('protocol', 'http')
+            }
+        }catch(e){}
 
         // имя в списке расширений (лампа берёт имя только из каталога cub)
         ;(function selfName(){

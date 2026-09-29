@@ -77,8 +77,12 @@ function Reguest(){
 }
 
 const sandbox = {
-    console, setTimeout,
+    console,
+    // setTimeout мгновенный: плашки вешаются отложенно (экран монтируется
+    // после append) — в песочке колбэки срабатывают сразу, тайминги ловит e2e
+    setTimeout(fn){ try{ fn() }catch(e){} return 0 },
     navigator: {},
+    location: { origin: 'http://localhost:8098' }, // как дев-стенд (TJS_DEV)
     document: {
         createElement: () => ({ style: {}, textContent: '', className: '', children: [], appendChild(c){ this.children.push(c) }, setAttribute(){}, remove(){}, click(){} }),
         head: { appendChild(){} },
@@ -173,7 +177,7 @@ console.log('✓ регистрация: 2 экрана, 2 пункта меню
 console.log('✓ варианты 14/30 дней: окно дат считается при открытии')
 
 // --- 3. «Топ»: меню пушит последний вариант, пагинация
-state.storage.top_last_variant = '7'
+state.storage.top_last_variant = '1' // movie_best в новой таблице (6 вариантов)
 calls.menu[0].cb()
 assert.strictEqual(calls.push[calls.push.length - 1].title, 'Топ · TMDB', 'заголовок экрана — как в меню')
 assert.strictEqual(calls.push[calls.push.length - 1].top_method, 'discover/movie')
@@ -212,6 +216,17 @@ state.feedJson = { page: 1, total_pages: 3, results: [
     assert.ok(vb2 && /^Red Head ?$/.test(vb2.textContent), 'студия сокращается: ' + (vb2 && vb2.textContent))
     assert.ok(calls.urls.some(u => u.includes('/feed?variant=movie_week&page=1')), '/feed с ключом варианта')
     assert.ok(calls.urls.some(u => u.includes('exclude=')), 'просмотренные id уходят серверу (страница после фильтра)')
+    // внешний адрес без схемы/prod: http принудительно становится https
+    assert.ok(calls.urls.some(u => u.startsWith('https://10.1.1.1:8355/feed')), 'внешний http-адрес переписывается в https (прод)')
+}
+// дев-контур: same-origin http (TJS_DEV кладёт origin+/topapi) — схема не трогается,
+// иначе Safari шлёт TLS-хендшейки в http-nginx и экран падает «нет подключения»
+state.fields.top_server_url = 'http://localhost:8098/topapi'
+state.favorite = { history: [] }
+{
+    const c0 = new calls.components['top_screen']({ page: 1, top_variant: 'movie_week', top_method: 'trending/movie/week', top_params: null })
+    c0.create()
+    assert.ok(calls.urls.some(u => u.startsWith('http://localhost:8098/topapi/feed')), 'same-origin http остаётся http (дев-стенд)')
 }
 // фолбэк: сервер упал — прямой TMDB
 state.feedJson = null
@@ -509,7 +524,7 @@ console.log('✓ «скрыть просмотренные»: 4 источник
         SettingsApi: { addComponent(){}, addParam(){} },
         Storage: {
             field(name){ return name === 'top_as_home' ? 'true' : undefined },
-            get(key, def){ return key === 'top_last_variant' ? '4' : def },
+            get(key, def){ return key === 'top_last_variant' ? '3' : def }, // tv_week в новой таблице
             set(){}
         },
         Activity: { push(){}, replace(a){ calls2.replace.push(a) } }

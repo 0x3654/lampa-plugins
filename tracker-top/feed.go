@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -28,16 +30,13 @@ type tmdbVariant struct {
 }
 
 var tmdbVariants = map[string]tmdbVariant{
+	// три смысла × фильмы/сериалы (тренды недели / лучшее / новинки 2025+);
+	// день, окна 14/30 дней убраны: совпадали с трендами на 78–100%
 	"movie_week": {Method: "trending/movie/week"},
-	"movie_day":  {Method: "trending/movie/day"},
-	"movie_14":   {Method: "discover/movie", WindowDays: 14, DateKey: "primary_release_date", Params: map[string]string{"sort_by": "popularity.desc", "vote_count.gte": "50"}},
-	"movie_30":   {Method: "discover/movie", WindowDays: 30, DateKey: "primary_release_date", Params: map[string]string{"sort_by": "popularity.desc", "vote_count.gte": "50"}},
-	"tv_week":    {Method: "trending/tv/week"},
-	"tv_day":     {Method: "trending/tv/day"},
-	"tv_30":      {Method: "discover/tv", WindowDays: 30, DateKey: "first_air_date", Params: map[string]string{"sort_by": "popularity.desc", "vote_count.gte": "20"}},
 	"movie_best": {Method: "discover/movie", Params: map[string]string{"sort_by": "vote_average.desc", "vote_count.gte": "2000"}},
-	"tv_best":    {Method: "discover/tv", Params: map[string]string{"sort_by": "vote_average.desc", "vote_count.gte": "1500"}},
 	"movie_2025": {Method: "discover/movie", Params: map[string]string{"sort_by": "popularity.desc", "primary_release_date.gte": "2025-01-01", "vote_count.gte": "100"}},
+	"tv_week":    {Method: "trending/tv/week"},
+	"tv_best":    {Method: "discover/tv", Params: map[string]string{"sort_by": "vote_average.desc", "vote_count.gte": "1500"}},
 	"tv_2025":    {Method: "discover/tv", Params: map[string]string{"sort_by": "popularity.desc", "first_air_date.gte": "2025-01-01", "vote_count.gte": "30"}},
 }
 
@@ -53,7 +52,10 @@ type tmdbCacheEntry struct {
 }
 
 func fetchTMDB(v tmdbVariant, page int) ([]map[string]any, error) {
-	key := fmt.Sprintf("%s|%d", v.Method, page)
+	// ключ — весь профиль варианта, НЕ только метод: у discover/movie четыре
+	// варианта (окна 14/30, лучшее, новинки) — по методу они склеивались
+	// в один кэш и все получали вселенную первого собранного
+	key := fmt.Sprintf("%s|%s|%d|%v|%d", v.Method, v.DateKey, v.WindowDays, v.Params, page)
 
 	tmdbCacheMu.Lock()
 	if e, ok := tmdbCache[key]; ok && time.Since(e.ts) < 10*time.Minute {
@@ -293,8 +295,9 @@ var _ = utf8.ValidString
 // Любая страница с любым exclude юзера нарезается из горячего пула мгновенно.
 
 var (
-	poolMu sync.Mutex
-	pools  = map[string]poolEntry{}
+	poolMu   sync.Mutex
+	poolBusy = map[string]bool{}
+	pools    = map[string]poolEntry{}
 )
 
 type poolEntry struct {
@@ -305,14 +308,100 @@ type poolEntry struct {
 const poolSize = 500 // глубокий пул: 100 на клиента после любых фильтров
 const poolTTL = 12 * time.Hour
 
-// getPool — пул варианта (собирает при промахе; вызывается прогревом и /feed)
+// findInTopBase — матч по базе «Топ · трекеров» (прогрета warm-циклом):
+// база знает ru-названия/год/качество/озвучку фактически, расхождений
+// «в трекерах есть — find не нашёл» не остаётся
+func findInTopBase(query, orig string, year int, typ string) (Item, bool) {
+	payload, _, err := getTop("both", "video", 3, true, "", "1", "seeds", "0")
+	if err != nil {
+		return Item{}, false
+	}
+
+	nq, no := normName(query), normName(orig)
+	tol := 1
+	if typ == "tv" {
+		tol = 6
+	}
+
+	var best *Item
+	for i := range payload.Items {
+		it := payload.Items[i]
+		if it.Year == 0 || year == 0 || abs(it.Year-year) > tol {
+			continue
+		}
+		ruM := normName(it.Ru) == nq && (no == "" || it.Orig == "" || normName(it.Orig) == no)
+		oM := no != "" && normName(it.Orig) == no
+		if !ruM && !oM {
+			continue
+		}
+		if best == nil || betterRelease(it, *best) {
+			cp := it
+			best = &cp
+		}
+	}
+
+	if best == nil {
+		return Item{}, false
+	}
+	return *best, true
+}
+
+// errPoolBuilding — пул собирается (обычно прогревом): /feed отдаёт сырую
+// страницу TMDB мгновенно, качество появится следующим открытием
+var errPoolBuilding = errors.New("pool building")
+
+// getPool — пул варианта (собирает при промахе; вызывается прогревом и /feed);
+// пока сборка идёт, повторные вызовы не ждут и не дублируют работу
+// getPool — пул варианта; сборка ВСЕГДА в фоне: первый запрос к варианту,
+// до которого не дошёл прогрев, запускает сборку горутиной и сразу получает
+// errPoolBuilding (клиенту — сырая страница TMDB), а не висит минуты в
+// синхронной сборке (nginx рвёт связь по 60с — 504)
 func getPool(variant string) ([]map[string]any, error) {
 	poolMu.Lock()
 	if e, ok := pools[variant]; ok && time.Since(e.ts) < poolTTL {
 		poolMu.Unlock()
 		return e.results, nil
 	}
+	if poolBusy[variant] {
+		poolMu.Unlock()
+		return nil, errPoolBuilding
+	}
+	poolBusy[variant] = true
 	poolMu.Unlock()
+
+	go func() {
+		defer func() {
+			poolMu.Lock()
+			delete(poolBusy, variant)
+			poolMu.Unlock()
+		}()
+
+		collected, err := buildPool(variant)
+		if err != nil {
+			log.Printf("pool %s: %v", variant, err)
+			return
+		}
+
+		// тонкий пул (транзиентная ошибка TMDB-прокси на сборке) не живёт
+		// 12ч: короткий TTL — следующее обращение пересоберёт
+		ts := time.Now()
+		if len(collected) < 50 {
+			ts = ts.Add(-poolTTL + 5*time.Minute)
+		}
+		poolMu.Lock()
+		pools[variant] = poolEntry{ts: ts, results: collected}
+		if len(pools) > 30 {
+			pools = map[string]poolEntry{}
+		}
+		poolMu.Unlock()
+	}()
+
+	return nil, errPoolBuilding
+}
+
+// buildPool — сборка: те же фильтры раздач, что и всегда (junk/ru, без
+// озвучек юзера — озвучечные фильтры узкие, их оставим на поиске, пул — базовый)
+func buildPool(variant string) ([]map[string]any, error) {
 
 	// сборка: те же фильтры раздач, что и всегда (junk/ru, без озвучек юзера —
 	// озвучечные фильтры узкие, их оставим на поиске, пул — базовый)
@@ -363,7 +452,10 @@ func getPool(variant string) ([]map[string]any, error) {
 				typ = "tv"
 			}
 
-			it, found := findWithCache2(query, orig, year, typ, "", "", true, true)
+			it, found := findInTopBase(query, orig, year, typ)
+			if !found {
+				it, found = findWithCache2(query, orig, year, typ, "", "", true, true)
+			}
 			if !found {
 				continue
 			}
@@ -384,27 +476,103 @@ func getPool(variant string) ([]map[string]any, error) {
 		tmdbPage++
 	}
 
-	poolMu.Lock()
-	pools[variant] = poolEntry{ts: time.Now(), results: collected}
-	if len(pools) > 30 {
-		pools = map[string]poolEntry{}
-	}
-	poolMu.Unlock()
-
 	return collected, nil
 }
 
-// poolPage — страница из пула с учётом exclude юзера
-func poolPage(variant string, page, feedSize int, exclude map[int]bool) ([]map[string]any, int, error) {
+// rawTMDBPage — сырая страница TMDB без проверки раздач (мгновенно):
+// ответ /feed, пока пул собирается; карточки без качества/озвучки
+func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool) ([]map[string]any, int, error) {
+	v, ok := tmdbVariants[variant]
+	if !ok {
+		return nil, 0, fmt.Errorf("unknown variant")
+	}
+
+	var collected []map[string]any
+	seen := map[float64]bool{}
+	tmdbPage := 1
+
+	for len(collected) < feedSize*page && tmdbPage <= 40 {
+		results, err := fetchTMDB(v, tmdbPage)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(results) == 0 {
+			break
+		}
+		for _, el := range results {
+			if isAnimePerson(el) {
+				continue
+			}
+			if idf, ok := el["id"].(float64); ok {
+				if seen[idf] || (exclude != nil && exclude[int(idf)]) {
+					continue
+				}
+				seen[idf] = true
+			}
+			collected = append(collected, el)
+		}
+		tmdbPage++
+	}
+
+	total := (len(collected) + feedSize - 1) / feedSize
+	lo := (page - 1) * feedSize
+	hi := lo + feedSize
+	if lo > len(collected) {
+		lo = len(collected)
+	}
+	if hi > len(collected) {
+		hi = len(collected)
+	}
+	return collected[lo:hi], total, nil
+}
+
+// cardQualityRank — ранг человеческого качества карточки (из humanQuality)
+var cardQualityRank = map[string]int{"SD": 0, "720p": 1, "1080p": 2, "4K": 3}
+
+func minQualityRank(minq string) int {
+	switch minq {
+	case "720":
+		return 1
+	case "1080":
+		return 2
+	case "2160":
+		return 3
+	}
+	return 0
+}
+
+// poolPage — страница из пула с учётом exclude юзера и его фильтров раздач
+// (minq/озвучки): пул собирается без озвучечных фильтров юзера, поэтому
+// они применяются при нарезке — иначе SD и без-озвучковые карточки
+// протекают в отфильтрованный топ
+func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string) ([]map[string]any, int, error) {
 	all, err := getPool(variant)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	voiceSet := map[string]bool{}
+	for _, v := range strings.Split(voices, ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			voiceSet[v] = true
+		}
+	}
+	needRank := minQualityRank(minq)
+
 	filtered := make([]map[string]any, 0, len(all))
 	for _, el := range all {
 		if idf, ok := el["id"].(float64); ok && exclude != nil && exclude[int(idf)] {
 			continue
+		}
+		q, _ := el["quality"].(string)
+		if cardQualityRank[q] < needRank {
+			continue
+		}
+		if len(voiceSet) > 0 {
+			vv, _ := el["voice"].(string)
+			if !voiceSet[vv] {
+				continue
+			}
 		}
 		filtered = append(filtered, el)
 	}
