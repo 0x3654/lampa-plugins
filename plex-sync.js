@@ -776,7 +776,7 @@
 
                                 if(canHistory()){
                                     historyAdd.forEach(function(h){
-                                        try{ Lampa.Favorite.add('history', h.card, 100) }catch(e){}
+                                        try{ Lampa.Favorite.add('history', h.card, 5000) }catch(e){}
                                     })
 
                                     viewedAdd.forEach(function(v){
@@ -895,6 +895,27 @@
         }
 
         //---------- события
+
+        // лампа сама режет «Историю» до 100 (лимит захардкожен в старте
+        // плеера) — перехватываем add и для history поднимаем до 5000,
+        // пятилетка из Plex влезает; чужие лимиты не трогаем
+        ;(function uncropHistory(){
+            try{
+                var orig = Lampa.Favorite.add
+
+                if(orig.__plexUncrop) return
+
+                var wrap = function(where, card, limit){
+                    if(where === 'history') limit = 5000
+
+                    return orig.call(Lampa.Favorite, where, card, limit)
+                }
+
+                wrap.__plexUncrop = true
+                Lampa.Favorite.add = wrap
+            }
+            catch(e){}
+        })()
 
         Lampa.Player.listener.follow('start', onPlayerStart)
 

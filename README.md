@@ -124,7 +124,7 @@ until an account is linked.
 | Direction | What happens |
 |---|---|
 | Lampa → Plex | finished (≥ 90%) — scrobble on the server; partial — playback position; unmarked — unscrobble |
-| Plex → Lampa | «Sync now» pulls watched items and positions into the Lampa timeline (progress on cards), «Viewing history» and the «Viewed» marks (the cap of 100 history entries doesn't limit hiding) |
+| Plex → Lampa | «Sync now» pulls watched items and positions into the Lampa timeline (progress on cards), «Viewing history» and the «Viewed» marks (hiding feeds reads the marks and doesn't depend on history; the plugin also lifts lampa's own history cap of 100 to 1000) |
 
 Matching is exact, by TMDB guids (`tmdb://id` — the Plex Movie/Series
 agents carry them). A local mark newer than the incoming one is never
@@ -392,7 +392,7 @@ Bundle id любого приложения: `osascript -e 'id of app "Имя"'`
 | Направление | Что происходит |
 |---|---|
 | Lampa → Plex | досмотрели (≥ 90%) — scrobble на сервере; частичный просмотр — позиция; сняли отметку — unscrobble |
-| Plex → Lampa | «Синхронизировать» переносит просмотренное и позиции в таймлайн Lampa (прогресс на карточках), «Историю просмотров» и отметки «Просмотрено» (лимит истории 100 не ограничивает скрытие) |
+| Plex → Lampa | «Синхронизировать» переносит просмотренное и позиции в таймлайн Lampa (прогресс на карточках), «Историю просмотров» и отметки «Просмотрено» (скрытие лент читает отметки и не зависит от истории; заодно плагин поднимает сам лимит истории лампы со 100 до 1000) |
 
 Матчинг точный, по TMDB-гуидам (`tmdb://id` — их несут агенты Plex
 Movie/Series). Локальная отметка новее входящей не затирается (LWW). С

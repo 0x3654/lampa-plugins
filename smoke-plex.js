@@ -119,6 +119,12 @@ for(const p of calls.params){
 assert.strictEqual(param('plex_manual_url').param.default, 'https://ru2.0x3654.com/plex',
     'адрес сервера по умолчанию — https-тоннель ru2 (http режется с https-страниц)')
 console.log('✓ регистрация: раздел «Plex», 6 параметров, input с маркером, дефолт адреса — тоннель ru2')
+assert.strictEqual(sandbox.Lampa.Favorite.add.__plexUncrop, true, 'Favorite.add обёрнут: история не стрижётся до 100')
+// обёртка поднимает лимит history даже когда ядро лампы зовёт с 100
+sandbox.Lampa.Favorite.add('history', { id: 4242, title: 'T', release_date: '2026-01-01' }, 100)
+assert.strictEqual(calls.favoriteAdds.filter(f => f.type === 'history' && f.card.id === 4242)[0].limit, 5000,
+    'нативный вызов с лимитом 100 перехвачен и поднят до 5000')
+console.log('✓ обёртка истории: нативный add(…,100) → limit 5000')
 
 // --- 2. PIN-привязка: модалка с кодом → поллинг ловит authToken → токен сохранён, синк стартует
 {
@@ -288,6 +294,7 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     state.tmdb['tv/500'] = { id: 500, name: 'Сериал', original_name: 'Show Name', first_air_date: '2026-01-01' }
     state.tmdb['tv/501'] = { id: 501, name: 'Полный', original_name: 'Full Show', first_air_date: '2026-01-01' }
 
+    const addMark = calls.favoriteAdds.length // отсечь историю-проверку обёртки из блока 1
     param('plex_sync_now').onChange()
 
     // фильм: percent 100, received, updated = lastViewedAt*1000
@@ -308,15 +315,15 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     assert.strictEqual(epPart.percent, 22, 'частичный: 600с/2700с → 22%')
 
     // история: фильм и оба шоу, свежие первыми (910 → 1750000300 максимум)
-    const histAdds = calls.favoriteAdds.filter(f => f.type === 'history')
+    const histAdds = calls.favoriteAdds.slice(addMark).filter(f => f.type === 'history')
     assert.ok(histAdds.some(f => f.card.id === 100), 'фильм в «Историю»')
     assert.ok(histAdds.some(f => f.card.id === 500) && histAdds.some(f => f.card.id === 501), 'оба шоу в «Историю»')
-    assert.ok(histAdds.every(f => f.limit === 100))
+    assert.ok(histAdds.every(f => f.limit === 5000))
     assert.strictEqual(histAdds[0].card.id, 501, 'самое свежее шоу — первым в истории')
 
     // «Просмотрено» (галки + скрытие, без лимита истории): просмотренный
     // фильм и полностью просмотренное шоу; шоу с частичной серией — нет
-    const viewedAdds = calls.favoriteAdds.filter(f => f.type === 'viewed')
+    const viewedAdds = calls.favoriteAdds.slice(addMark).filter(f => f.type === 'viewed')
     assert.ok(viewedAdds.some(f => f.card.id === 100), 'просмотренный фильм — в «Просмотрено»')
     assert.ok(viewedAdds.some(f => f.card.id === 501), 'полностью просмотренное шоу — в «Просмотрено»')
     assert.ok(!viewedAdds.some(f => f.card.id === 500), 'шоу с недосмотренной серией — НЕ в «Просмотрено»')
