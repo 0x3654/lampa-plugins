@@ -387,4 +387,75 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     console.log('✓ миграция старых адресов тоннеля → https://ru2.0x3654.com/plex')
 }
 
+// --- 9. досинхронизация в покое: смена SYNC_REV → один фоновый импорт
+// при первом старте, дальше тишина (два «перезапуска» приложения)
+{
+    const boot = (storage, fields, routes) => {
+        const c = { xhr: [], timelineUpdates: [], favoriteAdds: [] }
+        const s = { storage: JSON.parse(JSON.stringify(storage)), fields: JSON.parse(JSON.stringify(fields)), timeouts: [] }
+        class FX {
+            constructor(){ this.headers = {} }
+            open(m, u){ this.method = m; this.url = u }
+            setRequestHeader(k, v){ this.headers[k.toLowerCase()] = v }
+            send(){
+                c.xhr.push({ url: this.url, method: this.method })
+                for(const r of routes){
+                    if(r.match(this.url, this.method)){
+                        const { status, json } = r.reply
+                        this.status = status; this.responseText = JSON.stringify(json); this.onload(); return
+                    }
+                }
+                this.status = 0; this.onerror()
+            }
+        }
+        const sb = {
+            console, Math, Date, JSON, parseInt,
+            navigator: {}, document: { createElement: () => ({}) },
+            XMLHttpRequest: FX,
+            setTimeout(fn){ s.timeouts.push(fn) },
+            setInterval(){ return 0 },
+        }
+        sb.window = sb; sb.appready = true
+        sb.$ = () => ({ find: () => ({ text: () => {} }) })
+        sb.Lampa = {
+            Lang: { add(){}, translate: k => k },
+            Noty: { show(){} },
+            Listener: { follow(){} },
+            Player: { listener: { follow(){} } },
+            Plugins: { get(){ return [] }, save(){} },
+            Modal: { open(){}, close(){} },
+            SettingsApi: { addComponent(){}, addParam(){} },
+            Storage: {
+                field(n){ return s.fields[n] },
+                get(k, d){ return k in s.storage ? s.storage[k] : d },
+                set(k, v){ s.storage[k] = v }
+            },
+            Utils: { hash: lampaHash },
+            Timeline: { update(p){ c.timelineUpdates.push(p) }, view(h){ return { hash: h, percent: 0, updated: 0 } } },
+            Favorite: { add(t, card, limit){ c.favoriteAdds.push({ type: t, card, limit }) } },
+            Account: { Permit: { sync: false } },
+            Api: { sources: { tmdb: { get(m, p, ok){ ok(undefined) } } } },
+        }
+        vm.createContext(sb)
+        vm.runInContext(source, sb)
+        s.timeouts.splice(0).forEach(fn => fn())
+        return { s, c }
+    }
+    const routes = [
+        { match: (u) => u.includes('ru2.0x3654.com/plex/identity'), reply: { status: 200, json: { MediaContainer: {} } } },
+        { match: (u) => u.includes('/library/sections?'), reply: { status: 200, json: { MediaContainer: { Directory: [{ key: 1, type: 'movie', title: 'M' }] } } } },
+        { match: (u) => u.includes('/library/sections/1/all'), reply: { status: 200, json: { MediaContainer: { totalSize: 1, Metadata: [
+            { ratingKey: 10, viewCount: 1, lastViewedAt: 1750000000, duration: 7200000, originalTitle: 'Warfare', title: 'Под огнём', year: 2025, Guid: [{ id: 'tmdb://777' }] }
+        ] } } } },
+    ]
+    const first = boot(state.storage, state.fields, routes)
+    assert.ok(first.c.xhr.some(x => x.url.includes('/library/sections/1/all')), 'фоновый импорт пошёл сам, без кнопки')
+    assert.strictEqual(String(first.s.storage.plex_sync_rev), '2', 'маркер ревизии записан')
+    assert.ok(first.c.favoriteAdds.some(f => f.type === 'viewed' && f.card.id === 777), 'галка доложилась (карточка из Plex)')
+
+    const second = boot(first.s.storage, state.fields, routes)
+    assert.ok(!second.c.xhr.some(x => x.url.includes('/library/sections/1/all')), 'следующий запуск — тихо, без обхода')
+    console.log('✓ досинхронизация в покое: один фоновый импорт после смены ревизии, дальше — тишина')
+}
+
 console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')

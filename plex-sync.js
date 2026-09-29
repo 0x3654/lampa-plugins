@@ -29,6 +29,9 @@
     var TV      = 'https://plex.tv/api/v2' // облако Plex (CORS открыт — проверено)
     var WATCHED = 90                       // %, с которого считаем просмотренным
     var PAGE    = 500                      // страница обхода библиотеки
+    var SYNC_REV = 2                       // ревизия логики импорта: подняли —
+                                           // все устройства один раз тихо
+                                           // досинхронятся при следующем старте
 
     function init(){
         var Lampa = window.Lampa
@@ -1074,11 +1077,25 @@
         //---------- автозапуск
 
         if(token()){
-            // тихая досылка накопленного + желаемый импорт при старте
+            // тихая досылка накопленного; после смены SYNC_REV (правили
+            // логику импорта) — один фоновый импорт без кнопки: LWW
+            // защищает локальные отметки, история/«Просмотрено» идемпотентны
             setTimeout(function(){
-                flushOutbox(function(){
-                    if(field('plex_import_start') === 'true') importAll(function(){})
-                })
+                var rev = ''
+
+                try{ rev = String(Lampa.Storage.get('plex_sync_rev', '')) }catch(e){}
+
+                if(rev !== String(SYNC_REV)){
+                    importAll(function(){
+                        try{ Lampa.Storage.set('plex_sync_rev', SYNC_REV) }catch(e){}
+                        flushOutbox()
+                    })
+                }
+                else{
+                    flushOutbox(function(){
+                        if(field('plex_import_start') === 'true') importAll(function(){})
+                    })
+                }
             }, 8000)
 
             setInterval(function(){
