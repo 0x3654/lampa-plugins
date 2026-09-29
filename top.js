@@ -284,6 +284,16 @@
         //---------- экран «Топ» (TMDB)
 
         function TopScreen(object){
+            // восстановленная активность может нести вариант, убранный из
+            // списка (movie_day и окна из старых версий) — сервер ответит
+            // «unknown variant»; ключ заменяем на последний выбранный,
+            // метод/параметры (путь прямого TMDB-фолбэка) не трогаем
+            ;(function sanitizeVariant(){
+                var known = VARIANTS.some(function(v){ return v.key === object.top_variant })
+
+                if(!known) object.top_variant = VARIANTS[lastVariantIndex()].key || 'movie_week'
+            })()
+
             var comp = new Lampa.InteractionCategory(object)
             var net  = new Lampa.Reguest()
 
