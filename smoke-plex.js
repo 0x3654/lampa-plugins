@@ -116,8 +116,8 @@ assert.deepStrictEqual(calls.params.map(p => p.param.name),
 for(const p of calls.params){
     if(p.param.type === 'input') assert.strictEqual(p.param.values, 'string', 'input обязан иметь values:string')
 }
-assert.strictEqual(param('plex_manual_url').param.default, 'http://ru2.0x3654.com:32400',
-    'адрес сервера по умолчанию — тоннель ru2')
+assert.strictEqual(param('plex_manual_url').param.default, 'https://ru2.0x3654.com/plex',
+    'адрес сервера по умолчанию — https-тоннель ru2 (http режется с https-страниц)')
 console.log('✓ регистрация: раздел «Plex», 6 параметров, input с маркером, дефолт адреса — тоннель ru2')
 
 // --- 2. PIN-привязка: модалка с кодом → поллинг ловит authToken → токен сохранён, синк стартует

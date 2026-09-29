@@ -65,7 +65,7 @@
             plex_linked:             { ru: 'Plex: аккаунт привязан',      en: 'Plex: account linked' },
             plex_no_server:          { ru: 'Plex: сервер недоступен',     en: 'Plex: server unreachable' },
             plex_manual_url:         { ru: 'Адрес сервера (пусто — авто)', en: 'Server address (empty = auto)' },
-            plex_manual_url_descr:   { ru: 'по умолчанию — наш тоннель (ru2); очистите — авто: адрес сервера аккаунта (LAN первым)', en: 'defaults to our tunnel (ru2); clear it for auto = account server address (LAN first)' },
+            plex_manual_url_descr:   { ru: 'по умолчанию — наш тоннель (ru2, https — http режется с https-страниц как mixed content); очистите — авто: адрес сервера аккаунта (LAN первым)', en: 'defaults to our ru2 tunnel over https (plain http is blocked as mixed content on https pages); clear it for auto = account server address (LAN first)' },
             plex_token_manual:       { ru: 'Токен X-Plex-Token (вручную)', en: 'X-Plex-Token (manual)' },
             plex_token_manual_descr: { ru: 'запасной способ привязки вместо кода', en: 'fallback linking method instead of the code' },
             plex_scrobble:           { ru: 'Отмечать просмотр в Plex',    en: 'Scrobble watching to Plex' },
@@ -960,8 +960,8 @@
                 name: 'plex_manual_url',
                 type: 'input',
                 values: 'string',
-                default: 'http://ru2.0x3654.com:32400',
-                placeholder: 'http://ru2.0x3654.com:32400'
+                default: 'https://ru2.0x3654.com/plex',
+                placeholder: 'https://ru2.0x3654.com/plex'
             },
             field: {
                 name: T('manual_url'),
