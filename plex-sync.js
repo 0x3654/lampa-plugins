@@ -315,7 +315,13 @@
                 var out = []
 
                 ;(((json || {}).MediaContainer || {}).Directory || []).forEach(function(d){
-                    if(d.Type === 'movie' || d.Type === 'show') out.push({ id: d.Key, type: d.Type, title: d.Title })
+                    // секции Plex отдаёт полями с маленькой буквы (key/type/
+                    // title), метаданные — с большой; терпим оба варианта
+                    var type = d.type || d.Type
+
+                    if(type === 'movie' || type === 'show'){
+                        out.push({ id: d.key || d.Key, type: type, title: d.title || d.Title || '' })
+                    }
                 })
 
                 sections = out
@@ -323,39 +329,52 @@
             }, function(){ cb([]) })
         }
 
-        var guidCache = {} // 'movie123' | 'show456' → ratingKey | null
+        // индекс библиотеки: tmdb-id → ratingKey. Guid-поиск сервера
+        // (?guid=tmdb://…) на новых агентах молча возвращает пусто (проверено
+        // на живой библиотеке по id, которые в ней точно есть) — матчим сами,
+        // одним обходом секций; индекс живёт до перезапуска
+        var libIdx = {} // kind → {tmdb: ratingKey}
 
-        // guid-фильтр: /library/sections/{id}/all?guid=tmdb://123 — точный матчинг
+        function indexLibrary(kind, cb){
+            if(libIdx[kind]) return cb(libIdx[kind])
+
+            var idx   = {}
+            var match = kind === 'movie' ? 'movie' : 'show'
+
+            loadSections(function(secs){
+                var pool = secs.filter(function(s){ return s.type === match })
+                var i = 0
+
+                ;(function next(){
+                    if(i >= pool.length){
+                        // пустой индекс не запоминаем: сеть мигнула при
+                        // обходе — следующий вызов повторит попытку
+                        if(Object.keys(idx).length) libIdx[kind] = idx
+
+                        return cb(idx)
+                    }
+
+                    walk(pool[i++], kind === 'movie' ? 1 : 2, function(items){
+                        items.forEach(function(item){
+                            var guids = tmdbGuids(item)
+                            if(!guids.length) return
+
+                            var m = /^tmdb:\/\/(\d+)/.exec(guids[0])
+
+                            if(m && !idx[m[1]]) idx[m[1]] = item.ratingKey
+                        })
+
+                        next()
+                    })
+                })()
+            })
+        }
+
         function findByGuid(kind, tmdb, cb){
             if(!tmdb) return cb(null)
 
-            var key = kind + tmdb
-
-            if(guidCache.hasOwnProperty(key)) return cb(guidCache[key] || null)
-
-            loadSections(function(secs){
-                var pool = secs.filter(function(s){ return s.type === kind })
-                var i = 0
-
-                function next(){
-                    if(i >= pool.length){
-                        guidCache[key] = null // негативный кэш до перезапуска
-                        return cb(null)
-                    }
-
-                    var sec = pool[i++]
-
-                    pms('GET', '/library/sections/' + sec.id + '/all', { guid: 'tmdb://' + tmdb }, function(json){
-                        var meta = ((((json || {}).MediaContainer || {}).Metadata) || [])[0]
-                        var rk = meta ? meta.ratingKey : null
-
-                        if(rk) guidCache[key] = rk
-
-                        cb(rk || null)
-                    }, function(){ next() })
-                }
-
-                next()
+            indexLibrary(kind, function(idx){
+                cb(idx[String(tmdb)] || null)
             })
         }
 
@@ -614,7 +633,7 @@
 
             var stat = { movies: 0, episodes: 0, seen: 0 }
             var movies = []  // {tmdb, viewed, offset, duration, viewedAt, fallbackTitle}
-            var shows = {}   // showTmdb → {eps: [...], lastAt}
+            var shows = []   // {tmdb, rk, fallbackTitle, eps: [...], lastAt}
             var historyAdd = []
 
             detectServer(function(srv){
@@ -631,21 +650,25 @@
 
                         var sec = queue.shift()
 
-                        walk(sec, sec.type === 'show' ? 4 : 1, function(items){
+                        // сериалы обходим по шоу (type=2), не по эпизодам:
+                        // эпизоды новых агентов Plex несут tmdb://<id эпизода>
+                        // без show/s/e, а шоу — tmdb://<id шоу>; эпизоды с их
+                        // viewCount/viewOffset заберём allLeaves по ratingKey
+                        walk(sec, sec.type === 'show' ? 2 : 1, function(items){
                             items.forEach(function(item){
                                 var guids = tmdbGuids(item)
                                 if(!guids.length) return
 
-                                var viewedAt = (parseInt(item.lastViewedAt, 10) || 0) * 1000
-                                var dur      = (parseInt(item.duration, 10) || 0) / 1000
-                                var viewed   = parseInt(item.viewCount, 10) > 0
-                                var offset   = (parseInt(item.viewOffset, 10) || 0) / 1000
-
-                                if(!viewed && !offset) return
-
-                                stat.seen++
-
                                 if(sec.type === 'movie'){
+                                    var viewedAt = (parseInt(item.lastViewedAt, 10) || 0) * 1000
+                                    var dur      = (parseInt(item.duration, 10) || 0) / 1000
+                                    var viewed   = parseInt(item.viewCount, 10) > 0
+                                    var offset   = (parseInt(item.viewOffset, 10) || 0) / 1000
+
+                                    if(!viewed && !offset) return
+
+                                    stat.seen++
+
                                     movies.push({
                                         tmdb: parseInt(/^tmdb:\/\/(\d+)/.exec(guids[0])[1], 10),
                                         viewed: viewed, offset: offset, duration: dur,
@@ -653,20 +676,13 @@
                                     })
                                 }
                                 else{
-                                    var sm = /^tmdb:\/\/(\d+)\/(\d+)\/(\d+)$/.exec(guids[0])
+                                    var tm = /^tmdb:\/\/(\d+)/.exec(guids[0])
 
-                                    if(!sm) return // эпизод с guid tmdb://show (без s/e) — не матчим
-
-                                    var showTmdb = parseInt(sm[1], 10)
-
-                                    if(!shows[showTmdb]) shows[showTmdb] = { eps: [], lastAt: 0 }
-
-                                    shows[showTmdb].eps.push({
-                                        s: parseInt(sm[2], 10), e: parseInt(sm[3], 10),
-                                        viewed: viewed, offset: offset, duration: dur, viewedAt: viewedAt
+                                    if(tm) shows.push({
+                                        tmdb: parseInt(tm[1], 10), rk: item.ratingKey,
+                                        fallbackTitle: item.originalTitle || item.title,
+                                        eps: [], lastAt: 0
                                     })
-
-                                    if(viewedAt > shows[showTmdb].lastAt) shows[showTmdb].lastAt = viewedAt
                                 }
                             })
 
@@ -696,34 +712,45 @@
                                 nextM()
                             })
                         }, function(){
-                            var ids = Object.keys(shows)
-
-                            mapLimit(ids, 3, function(id, nextS){
-                                var show = shows[id]
-
-                                tmdbGet('tv', parseInt(id, 10), function(card){
-                                    var orig = card ? card.original_name : ''
+                            mapLimit(shows, 3, function(sv, nextS){
+                                tmdbGet('tv', sv.tmdb, function(card){
+                                    // хеш серии — от original_name; fallback —
+                                    // originalTitle из библиотеки (тоже оригинал)
+                                    var orig = (card && card.original_name) || sv.fallbackTitle
 
                                     if(!orig) return nextS() // без имени не посчитать хеш серии
 
-                                    show.eps.forEach(function(ep){
-                                        var hash = hashEpisode(ep.s, ep.e, orig)
+                                    pms('GET', '/library/metadata/' + sv.rk + '/allLeaves', { includeGuids: 1 }, function(json){
+                                        ((((json || {}).MediaContainer || {}).Metadata) || []).forEach(function(m){
+                                            var viewed = parseInt(m.viewCount, 10) > 0
+                                            var offset = (parseInt(m.viewOffset, 10) || 0) / 1000
+                                            var vd     = (parseInt(m.lastViewedAt, 10) || 0) * 1000
+                                            var epDur  = (parseInt(m.duration, 10) || 0) / 1000
 
-                                        if(ep.viewed){
-                                            if(applyTimeline(hash, 100, ep.duration, ep.duration, ep.viewedAt || Date.now())) stat.episodes++
-                                        }
-                                        else if(ep.offset > 0){
-                                            applyTimeline(
-                                                hash,
-                                                ep.duration ? Math.min(95, Math.round(ep.offset / ep.duration * 100)) : 0,
-                                                ep.offset, ep.duration, ep.viewedAt || Date.now()
-                                            )
-                                        }
-                                    })
+                                            if(!viewed && !offset) return
 
-                                    if(card && show.lastAt) historyAdd.push({ card: card, viewedAt: show.lastAt })
+                                            stat.seen++
 
-                                    nextS()
+                                            var hash = hashEpisode(parseInt(m.parentIndex, 10), parseInt(m.index, 10), orig)
+
+                                            if(viewed){
+                                                if(applyTimeline(hash, 100, epDur, epDur, vd || Date.now())) stat.episodes++
+                                            }
+                                            else{
+                                                applyTimeline(
+                                                    hash,
+                                                    epDur ? Math.min(95, Math.round(offset / epDur * 100)) : 0,
+                                                    offset, epDur, vd || Date.now()
+                                                )
+                                            }
+
+                                            if(vd > sv.lastAt) sv.lastAt = vd
+                                        })
+
+                                        if(card && sv.lastAt) historyAdd.push({ card: card, viewedAt: sv.lastAt })
+
+                                        nextS()
+                                    }, function(){ nextS() })
                                 })
                             }, function(){
                                 // «История просмотров»: свежие сверху, лимит Lampa сама режет до 100

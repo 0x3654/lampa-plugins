@@ -157,14 +157,18 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     state.storage.plex_token_save = 'TOKEN-1'
 
     route((url) => url.includes('plex.local:32400/identity'), { status: 200, json: { MediaContainer: {} } })
+    // секции реальный Plex отдаёт с маленькой буквы (key/type/title) —
+    // метаданные при этом с большой; фиксатор регресса регистра
     route((url) => url.includes('/library/sections?'), {
         status: 200,
-        json: { MediaContainer: { Directory: [{ Key: 1, Type: 'movie', Title: 'Кино' }, { Key: 2, Type: 'show', Title: 'Сериалы' }] } }
+        json: { MediaContainer: { Directory: [{ key: 1, type: 'movie', title: 'Кино' }, { key: 2, type: 'show', title: 'Сериалы' }] } }
     })
-    route((url) => decodeURIComponent(url).includes('guid=tmdb://100'), {
-        status: 200, json: { MediaContainer: { Metadata: [{ ratingKey: 777 }] } }
-    })
-    route((url) => url.includes('/library/sections/1/all'), { status: 200, json: { MediaContainer: { totalSize: 0, Metadata: [] } } })
+    // матчинг — обходным индексом: реальный Plex на новых агентах на
+    // ?guid=tmdb://… молча даёт пусто (проверено на живой библиотеке);
+    // айтем без viewCount/viewOffset — импорт скипнет, индекс найдёт
+    route((url) => url.includes('/library/sections/1/all'), { status: 200, json: { MediaContainer: { totalSize: 1, Metadata: [
+        { ratingKey: 777, title: 'Холоп', Guid: [{ id: 'tmdb://100' }] }
+    ] } } })
     route((url) => url.includes('/library/sections/2/all'), { status: 200, json: { MediaContainer: { totalSize: 0, Metadata: [] } } })
     route((url) => url.includes('/:/scrobble'), { status: 200, json: {} })
     route((url) => url.includes('/:/progress'), { status: 200, json: {} })
@@ -213,9 +217,10 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
 {
     state.xhrRoutes.length = 0
 
-    route((url) => decodeURIComponent(url).includes('guid=tmdb://500'), {
-        status: 200, json: { MediaContainer: { Metadata: [{ ratingKey: 900 }] } }
-    })
+    // шоу-индекс — обходом секции (guid-поиск сервера не работает)
+    route((url) => url.includes('/library/sections/2/all'), { status: 200, json: { MediaContainer: { totalSize: 1, Metadata: [
+        { ratingKey: 900, title: 'Сериал', Guid: [{ id: 'tmdb://500' }] }
+    ] } } })
     route((url) => url.includes('/library/metadata/900/allLeaves'), {
         status: 200,
         json: { MediaContainer: { Metadata: [
@@ -255,13 +260,20 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
             { ratingKey: 11, viewCount: 0, viewOffset: 0, Guid: [{ id: 'tmdb://999' }] } // не смотрели — мимо
         ] } }
     })
+    // шоу-секция: обход по шоу (type=2, как реальный Plex: гайд эпизода —
+    // tmdb://<id эпизода>, у шоу — tmdb://<id шоу>), эпизоды — allLeaves
     route((url) => url.includes('/library/sections/2/all') && !url.includes('guid='), {
         status: 200,
-        json: { MediaContainer: { totalSize: 2, Metadata: [
-            { ratingKey: 20, viewCount: 1, lastViewedAt: 1750000100, duration: 2700000, parentIndex: 1, index: 2,
-              Guid: [{ id: 'tmdb://500/1/2' }] },
-            { ratingKey: 21, viewCount: 0, viewOffset: 600000, duration: 2700000, parentIndex: 11, index: 2,
-              Guid: [{ id: 'tmdb://500/11/2' }] } // частично: 600с из 2700с
+        json: { MediaContainer: { totalSize: 1, Metadata: [
+            { ratingKey: 900, title: 'Сериал', originalTitle: 'Show Name', Guid: [{ id: 'tmdb://500' }] }
+        ] } }
+    })
+    route((url) => url.includes('/library/metadata/900/allLeaves'), {
+        status: 200,
+        json: { MediaContainer: { Metadata: [
+            { ratingKey: 901, parentIndex: 1, index: 1, viewCount: 1, lastViewedAt: 1750000050, duration: 2700000 },
+            { ratingKey: 902, parentIndex: 1, index: 2, viewCount: 1, lastViewedAt: 1750000100, duration: 2700000 },
+            { ratingKey: 903, parentIndex: 11, index: 2, viewCount: 0, viewOffset: 600000, lastViewedAt: 1750000200, duration: 2700000 } // частично: 600с из 2700с
         ] } }
     })
     route((url) => url.includes('/:/progress'), { status: 200, json: {} })
@@ -278,7 +290,7 @@ console.log('✓ регистрация: раздел «Plex», 6 парамет
     assert.strictEqual(movieUpd.updated, 1750000000 * 1000)
     assert.strictEqual(movieUpd.time, 7200)
 
-    // эпизоды: s1e2 — watched; s11e2 — частичный (22%), хеш с двоеточием
+    // эпизоды: s1e2 — watched (902); s11e2 — частичный (903, 600с/2700с → 22%)
     const epUpd = calls.timelineUpdates.find(u => u.hash === lampaHash('12Show Name'))
     assert.ok(epUpd, 'таймлайн эпизода s01e02 (сезон<=10: без двоеточия)')
     assert.strictEqual(epUpd.percent, 100)
