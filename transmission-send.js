@@ -51,9 +51,6 @@
             transmission_send_menu_copy:        { ru: 'Скопировать магнет',  en: 'Copy magnet' },
             transmission_send_menu_open:        { ru: 'Открыть магнет',      en: 'Open magnet' },
             transmission_send_menu_plex:        { ru: 'Добавить в Plex',     en: 'Add to Plex' },
-            transmission_send_menu_card:        { ru: 'Описание раздачи',    en: 'Release info' },
-            transmission_send_card_load:        { ru: 'Загрузка…',           en: 'Loading…' },
-            transmission_send_card_nofind:      { ru: 'Тема не найдена на трекере', en: 'Topic not found on the tracker' },
 
             transmission_send_copied:           { ru: 'Магнет скопирован',   en: 'Magnet copied' },
             transmission_send_copy_fail:        { ru: 'Не удалось скопировать', en: 'Copy failed' },
@@ -430,72 +427,6 @@
         }
 
 
-        //---------- карточка раздачи (описание + обложка со страницы темы,
-        //---------- те же данные, из которых nnm-rss собирает description лент)
-
-        function esc(t){
-            return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        }
-
-        function cardHtml(c){
-            var html = '<div class="torrent-send-card" style="padding:15px 20px;font-size:1.05em;line-height:1.5">'
-
-            html += '<div style="display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:15px">'
-
-            if(c.poster) html += '<img src="' + esc(c.poster) + '" style="width:180px;flex:none;border-radius:8px" />'
-
-            html += '<div style="-webkit-flex:1;flex:1;min-width:220px">'
-
-            if(c.imdb_rating) html += '<div style="opacity:.8;margin-bottom:6px">IMDb: ' + esc(c.imdb_rating) +
-                (c.imdb_votes ? ' (' + esc(c.imdb_votes) + ')' : '') + '</div>'
-
-            if(c.tor_name) html += '<div style="opacity:.7;font-size:.85em;margin-bottom:6px">' + esc(c.tor_name) +
-                (c.tor_size ? ' · ' + esc(c.tor_size) : '') + '</div>'
-
-            html += '</div></div>'
-
-            if(c.tech && c.tech.length){
-                html += '<div style="margin-top:12px;opacity:.9">'
-
-                c.tech.forEach(function(f){
-                    html += '<div style="margin:3px 0"><b>' + esc(f.Name) + ':</b> ' + esc(f.Value) + '</div>'
-                })
-
-                html += '</div>'
-            }
-
-            if(c.descr) html += '<div style="margin-top:12px;white-space:pre-line">' + esc(c.descr) + '</div>'
-
-            if(c.topic_url) html += '<div style="margin-top:12px;opacity:.55;font-size:.8em">' + esc(c.topic_url) + '</div>'
-
-            return html + '</div>'
-        }
-
-        function showCard(magnet, meta){
-            var hash = btihOf(magnet)
-
-            if(!hash) return noty(N('fail'), 'error')
-
-            var title = (meta && meta.title) || ''
-
-            Lampa.Modal.open({
-                title: title || T('menu_card'),
-                html: '<div style="padding:30px;text-align:center;opacity:.7">' + T('card_load') + '</div>',
-                size: 'large',
-                onBack: function(){ Lampa.Modal.close() }
-            })
-
-            request('GET', '/api/card?hash=' + hash + '&title=' + encodeURIComponent(title), null, null, function(status, json){
-                if(status !== 200 || !json){
-                    Lampa.Modal.close()
-
-                    return noty(status === 404 ? T('card_nofind') : N('fail'), 'error')
-                }
-
-                Lampa.Modal.update(cardHtml(json))
-            })
-        }
-
         //---------- меню
 
         function wrap(prev, fn){
@@ -517,11 +448,6 @@
             menu.push({
                 title: T('menu_open'),
                 onSelect: wrap(prev, function(){ openMagnet(magnet) })
-            })
-
-            menu.push({
-                title: T('menu_card'),
-                onSelect: wrap(prev, function(){ showCard(magnet, meta) })
             })
 
             menu.push({
