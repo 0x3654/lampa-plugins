@@ -260,10 +260,14 @@ console.log('✓ обёртка истории: нативный add(…,100) �
 
     route((url) => url.includes('/library/sections/1/all') && !url.includes('guid='), {
         status: 200,
-        json: { MediaContainer: { totalSize: 2, Metadata: [
+        json: { MediaContainer: { totalSize: 3, Metadata: [
             { ratingKey: 10, viewCount: 2, lastViewedAt: 1750000000, duration: 7200000, originalTitle: 'Kholop', title: 'Холоп',
               Guid: [{ id: 'tmdb://100' }, { id: 'imdb://tt123' }] },
-            { ratingKey: 11, viewCount: 0, viewOffset: 0, Guid: [{ id: 'tmdb://999' }] } // не смотрели — мимо
+            { ratingKey: 11, viewCount: 0, viewOffset: 0, Guid: [{ id: 'tmdb://999' }] }, // не смотрели — мимо
+            // просмотрен, но карточки TMDB нет (tmdbGet упал) — история и
+            // «Просмотрено» обязаны встать из метаданных Plex (кейс «Под огнём»)
+            { ratingKey: 12, viewCount: 1, lastViewedAt: 1750000000, duration: 5400000, originalTitle: 'Warfare', title: 'Под огнём', year: 2025,
+              Guid: [{ id: 'tmdb://777' }] }
         ] } }
     })
     // шоу-секция: обход по шоу (type=2, как реальный Plex: гайд эпизода —
@@ -327,6 +331,16 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     assert.ok(viewedAdds.some(f => f.card.id === 100), 'просмотренный фильм — в «Просмотрено»')
     assert.ok(viewedAdds.some(f => f.card.id === 501), 'полностью просмотренное шоу — в «Просмотрено»')
     assert.ok(!viewedAdds.some(f => f.card.id === 500), 'шоу с недосмотренной серией — НЕ в «Просмотрено»')
+
+    // карточка TMDB не догрузилась (tmdbGet упал) — всё равно полная тройка
+    // признаков из метаданных Plex (живой кейс «Под огнём» 1241436)
+    const noTmdb = histAdds.find(f => f.card.id === 777)
+    assert.ok(noTmdb, 'фильм без карточки TMDB — в «Истории» (карточка из Plex)')
+    assert.strictEqual(noTmdb.card.title, 'Под огнём')
+    assert.strictEqual(noTmdb.card.release_date, '2025-01-01')
+    assert.ok(viewedAdds.some(f => f.card.id === 777), 'фильм без карточки TMDB — в «Просмотрено»')
+    const noTmdbUpd = calls.timelineUpdates.find(u => u.hash === lampaHash('Warfare'))
+    assert.ok(noTmdbUpd && noTmdbUpd.percent === 100, 'таймлайн по fallback-названию из Plex')
 
     assert.ok(calls.noty.some(n => n.text.includes('plex_sync_done')), 'итог импорта показан')
     console.log('✓ Plex→Lampa: таймлайн фильм+эпизоды (received, штампы) + «История» по свежести')

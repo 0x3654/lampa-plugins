@@ -683,7 +683,9 @@
                                     movies.push({
                                         tmdb: parseInt(/^tmdb:\/\/(\d+)/.exec(guids[0])[1], 10),
                                         viewed: viewed, offset: offset, duration: dur,
-                                        viewedAt: viewedAt, fallbackTitle: item.originalTitle || item.title
+                                        viewedAt: viewedAt, fallbackTitle: item.originalTitle || item.title,
+                                        title: item.title, originalTitle: item.originalTitle || item.title,
+                                        year: parseInt(item.year, 10) || 0
                                     })
                                 }
                                 else{
@@ -692,6 +694,8 @@
                                     if(tm) shows.push({
                                         tmdb: parseInt(tm[1], 10), rk: item.ratingKey,
                                         fallbackTitle: item.originalTitle || item.title,
+                                        title: item.title, originalTitle: item.originalTitle || item.title,
+                                        year: parseInt(item.year, 10) || 0,
                                         eps: [], lastAt: 0
                                     })
                                 }
@@ -702,10 +706,31 @@
                     }
 
                     function process(){
+                        // карточка для «Истории»/«Просмотрено»: TMDB мог не
+                        // догрузиться (сотни запросов через прокси, часть
+                        // падает) — минимальную строим из метаданных Plex,
+                        // иначе фильм получит таймлайн, но останется в лентах
+                        function movieCard(mv, card){
+                            return card || {
+                                id: mv.tmdb, title: mv.title,
+                                original_title: mv.originalTitle,
+                                release_date: mv.year ? mv.year + '-01-01' : ''
+                            }
+                        }
+
+                        function showCard(sv, card){
+                            return card || {
+                                id: sv.tmdb, name: sv.title,
+                                original_name: sv.originalTitle,
+                                first_air_date: sv.year ? sv.year + '-01-01' : ''
+                            }
+                        }
+
                         mapLimit(movies, 3, function(mv, nextM){
                             tmdbGet('movie', mv.tmdb, function(card){
                                 var orig = card ? card.original_title : mv.fallbackTitle
                                 var hash = hashMovie(orig)
+                                var use  = movieCard(mv, card)
 
                                 if(mv.viewed){
                                     if(applyTimeline(hash, 100, mv.duration, mv.duration, mv.viewedAt || Date.now())) stat.movies++
@@ -718,8 +743,8 @@
                                     )
                                 }
 
-                                if(card && mv.viewedAt) historyAdd.push({ card: card, viewedAt: mv.viewedAt })
-                                if(card && mv.viewed) viewedAdd.push({ card: card })
+                                if(use && mv.viewedAt) historyAdd.push({ card: use, viewedAt: mv.viewedAt })
+                                if(use && mv.viewed) viewedAdd.push({ card: use })
 
                                 nextM()
                             })
@@ -729,6 +754,7 @@
                                     // хеш серии — от original_name; fallback —
                                     // originalTitle из библиотеки (тоже оригинал)
                                     var orig = (card && card.original_name) || sv.fallbackTitle
+                                    var use  = showCard(sv, card)
 
                                     if(!orig) return nextS() // без имени не посчитать хеш серии
 
@@ -764,8 +790,8 @@
                                             if(vd > sv.lastAt) sv.lastAt = vd
                                         })
 
-                                        if(card && sv.lastAt) historyAdd.push({ card: card, viewedAt: sv.lastAt })
-                                        if(card && full) viewedAdd.push({ card: card })
+                                        if(use && sv.lastAt) historyAdd.push({ card: use, viewedAt: sv.lastAt })
+                                        if(use && full) viewedAdd.push({ card: use })
 
                                         nextS()
                                     }, function(){ nextS() })
