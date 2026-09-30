@@ -206,13 +206,17 @@
 
     // похоже ли на Apple TV по текущему состоянию (вызывается после
     // загрузки — размеры окна уже устоялись, в отличие от старта лампы);
-    // «ontouchstart» отсекает настоящий iPad (у tvOS тача нет)
+    // «ontouchstart» отсекает настоящий iPad (у tvOS тача нет). Размер —
+    // «большой и широкий», а не строго 1920×1080: WebView «подмены адреса»
+    // может отдать чуть иные метрики (safe-area/скейл), и строгая проверка
+    // оставляла платформу browser — без нативного меню настроек, где
+    // тумблер автозапуска встроенного TorrServer
     function looksLikeAppleTV(){
         var ua = (navigator.userAgent || '').toLowerCase()
 
         return (ua.indexOf('ipad') > -1 || ua.indexOf('appletv') > -1 || ua.indexOf('apple tv') > -1) &&
             !('ontouchstart' in window) &&
-            window.innerWidth === 1920 && window.innerHeight === 1080
+            window.innerWidth >= 1500 && window.innerHeight >= 800
     }
 
     function init(){
@@ -305,6 +309,9 @@
         try{
             if(Lampa.Platform.get() !== 'apple_tv' && looksLikeAppleTV()){
                 Lampa.Storage.set('platform', 'apple_tv')
+                // нативный флаг лампы ставился в false при провале детекта —
+                // без него нативные мосты (lampa://…) не работают
+                Lampa.Storage.set('native', true)
 
                 reload = true
             }
