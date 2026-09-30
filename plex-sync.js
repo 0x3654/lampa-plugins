@@ -187,7 +187,7 @@
             var t = Lampa.Storage.get('plex_token_save', '')
             if(!t) t = field('plex_token_manual').trim()
             if(t === 'undefined' || t === 'null') t = ''
-            return t
+            return String(t).replace(/^"+|"+$/g, '') // на случай двойного JSON-кодирования
         }
 
         function saveToken(t){
@@ -338,7 +338,11 @@
 
                 sections = out
                 cb(out)
-            }, function(){ cb([]) })
+            }, function(json, status){
+                // 401/403 — токен не работает: это не «пустая библиотека»,
+                // а сломанный обход (иначе досинхронизация пометит успех)
+                cb(status === 401 || status === 403 ? null : [])
+            })
         }
 
         // индекс библиотеки: tmdb-id → ratingKey. Guid-поиск сервера
@@ -354,6 +358,9 @@
             var match = kind === 'movie' ? 'movie' : 'show'
 
             loadSections(function(secs){
+                if(!secs) return cb({}) // токен/сервер сломаны — пустой
+                                        // индекс, не кэшируем (будет ретрай)
+
                 var pool = secs.filter(function(s){ return s.type === match })
                 var i = 0
 
@@ -657,6 +664,11 @@
                 }
 
                 loadSections(function(secs){
+                    if(!secs){
+                        importing = false
+                        return done('server', stat)
+                    }
+
                     var queue = secs.slice(0)
 
                     function nextSection(){
