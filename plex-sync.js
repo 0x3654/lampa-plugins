@@ -893,13 +893,19 @@
 
                 box.find('.plex-pin-code').text(formatCode(pin.code))
 
-                // QR активации: plex.tv отдаёт картинку под код — телефон
-                // сканирует и сразу попадает на страницу ввода
+                // QR активации: plex.tv отдаёт PNG под код — телефон сканирует
+                // и сразу попадает на страницу ввода. Грузим через fetch→blob:
+                // тот же канал, что пуллинг PIN, — прямой <img src> на tvOS
+                // не всегда красится
                 if(pin.qr){
                     try{
-                        box.find('.plex-pin-qr').html(
-                            '<img src="' + pin.qr + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
-                        )
+                        fetch(pin.qr).then(function(r){ return r.blob() }).then(function(b){
+                            var src = URL.createObjectURL(b)
+
+                            box.find('.plex-pin-qr').html(
+                                '<img src="' + src + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
+                            )
+                        }).catch(function(){})
                     }catch(e){}
                 }
 

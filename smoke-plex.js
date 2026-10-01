@@ -58,8 +58,12 @@ const sandbox = {
     XMLHttpRequest: FakeXHR,
     setInterval(fn){ const id = state.nextInterval++; state.intervals[id] = fn; return id },
     clearInterval(id){ delete state.intervals[id] },
+    // синхронный thenable для fetch→blob QR (assert работает без микротасков)
+    fetch(url){ const ok = { blob: () => syncThenable({ type: 'image/png' }) }; return syncThenable(ok) },
+    URL: { createObjectURL(){ return 'blob:qr-test' } },
     window: null
 }
+function syncThenable(v){ return { then(fn){ if(fn) fn(v); return syncThenable(v) } } }
 sandbox.window = sandbox
 sandbox.appready = true
 
@@ -144,7 +148,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     param('plex_link').onChange()
 
     assert.strictEqual(calls.modal.length, 1, 'модалка с кодом открыта')
-    assert.ok(String(state.qrHtml || '').includes('pins/qr/DWZX'), 'QR активации вставлен в модалку')
+    assert.ok(String(state.qrHtml || '').includes('<img') && String(state.qrHtml || '').includes('blob:'), 'QR активации вставлен в модалку (blob-картинка)')
 
     tick() // первый поллинг: authToken пуст
     tick() // второй: authToken выдан
