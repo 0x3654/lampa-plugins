@@ -470,7 +470,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
 
     const first = boot(state.storage, state.fields, routes)
     assert.ok(first.c.xhr.some(x => x.url.includes('/library/sections/1/all')), 'фоновый импорт пошёл сам, без кнопки')
-    assert.strictEqual(String(first.s.storage.plex_sync_rev), '3', 'маркер ревизии записан')
+    assert.strictEqual(String(first.s.storage.plex_sync_rev), '4', 'маркер ревизии записан')
     assert.ok(first.c.favoriteAdds.some(f => f.type === 'viewed' && f.card.id === 777), 'галка доложилась (карточка из Plex)')
     assert.ok(first.s.storage.plex_imp && first.s.storage.plex_imp.stat, 'статистика импорта записана и на фоне')
 
