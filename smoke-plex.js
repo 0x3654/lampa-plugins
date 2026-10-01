@@ -66,7 +66,10 @@ sandbox.appready = true
 // минимальный фейк jQuery для модалки привязки (код + таймер)
 sandbox.$ = function(html){
     const el = { codeShown: '', timerShown: '' }
-    el.find = (sel) => ({ text: (t) => { if(sel === '.plex-pin-code'){ el.codeShown = t; state.pinShown = t } } })
+    el.find = (sel) => ({
+        text: (t) => { if(sel === '.plex-pin-code'){ el.codeShown = t; state.pinShown = t } },
+        html: (v) => { if(sel === '.plex-pin-qr' && v) state.qrHtml = v }
+    })
     return el
 }
 sandbox.Lampa = {
@@ -130,7 +133,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
 {
     let pinPolls = 0
 
-    route((url, method) => method === 'POST' && url.includes('/api/v2/pins'), { status: 201, json: { id: 12345, code: 'DWZX', expiresIn: 900 } })
+    route((url, method) => method === 'POST' && url.includes('/api/v2/pins'), { status: 201, json: { id: 12345, code: 'DWZX', expiresIn: 900, qr: 'https://plex.tv/api/v2/pins/qr/DWZX' } })
     route((url) => url.includes('/pins/12345'), {
         status: 200,
         json: { get authToken(){ return ++pinPolls > 1 ? 'TOKEN-1' : '' } }
@@ -141,6 +144,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     param('plex_link').onChange()
 
     assert.strictEqual(calls.modal.length, 1, 'модалка с кодом открыта')
+    assert.ok(String(state.qrHtml || '').includes('pins/qr/DWZX'), 'QR активации вставлен в модалку')
 
     tick() // первый поллинг: authToken пуст
     tick() // второй: authToken выдан

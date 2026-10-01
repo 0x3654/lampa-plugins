@@ -857,6 +857,7 @@
             var box = $(
                 '<div class="about" style="text-align:center">' +
                     '<div class="plex-pin-code" style="font-size:1.8em;letter-spacing:.25em;font-weight:300;word-break:break-word;padding:0 .6em">— — — —</div>' +
+                    '<div class="plex-pin-qr" style="margin-top:1.2em"></div>' +
                     '<div style="margin-top:1.4em;opacity:.8">' + T('code_enter') + '</div>' +
                     '<div style="margin-top:1.4em;opacity:.4" class="plex-pin-timer"></div>' +
                 '</div>'
@@ -891,6 +892,16 @@
                 }
 
                 box.find('.plex-pin-code').text(formatCode(pin.code))
+
+                // QR активации: plex.tv отдаёт картинку под код — телефон
+                // сканирует и сразу попадает на страницу ввода
+                if(pin.qr){
+                    try{
+                        box.find('.plex-pin-qr').html(
+                            '<img src="' + pin.qr + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
+                        )
+                    }catch(e){}
+                }
 
                 left = (pin.expiresIn && parseInt(pin.expiresIn, 10)) || 900
 
