@@ -310,8 +310,11 @@ const poolTTL = 12 * time.Hour
 
 // findInTopBase — матч по базе «Топ · трекеров» (прогрета warm-циклом):
 // база знает ru-названия/год/качество/озвучку фактически, расхождений
-// «в трекерах есть — find не нашёл» не остаётся
-func findInTopBase(query, orig string, year int, typ string) (Item, bool) {
+// «в трекерах есть — find не нашёл» не остаётся. minq/voices — фильтры
+// юзера (те же, что в findRelease2): лучшая раздача выбирается СРЕДИ
+// подходящих — плашка показывает максимум под фильтром, а не озвученный
+// 720p при живом 1080p (голос в betterRelease стоит выше качества)
+func findInTopBase(query, orig string, year int, typ, minq, voices string) (Item, bool) {
 	payload, _, err := getTop("both", "video", 3, true, "", "1", "seeds", "0")
 	if err != nil {
 		return Item{}, false
@@ -323,7 +326,7 @@ func findInTopBase(query, orig string, year int, typ string) (Item, bool) {
 		tol = 6
 	}
 
-	var best *Item
+	var kept []Item
 	for i := range payload.Items {
 		it := payload.Items[i]
 		if it.Year == 0 || year == 0 || abs(it.Year-year) > tol {
@@ -334,8 +337,16 @@ func findInTopBase(query, orig string, year int, typ string) (Item, bool) {
 		if !ruM && !oM {
 			continue
 		}
-		if best == nil || betterRelease(it, *best) {
-			cp := it
+		kept = append(kept, it)
+	}
+
+	kept = filterItems(kept, minq, "all")
+	kept = filterVoice(kept, voices)
+
+	var best *Item
+	for i := range kept {
+		if best == nil || betterRelease(kept[i], *best) {
+			cp := kept[i]
 			best = &cp
 		}
 	}
@@ -344,6 +355,65 @@ func findInTopBase(query, orig string, year int, typ string) (Item, bool) {
 		return Item{}, false
 	}
 	return *best, true
+}
+
+// cardFields — поля карточки для повторного матча по базе
+func cardFields(el map[string]any) (query, orig string, year int, typ string) {
+	query, _ = el["title"].(string)
+	if query == "" {
+		query, _ = el["name"].(string)
+	}
+	orig, _ = el["original_title"].(string)
+	if orig == "" {
+		orig, _ = el["original_name"].(string)
+	}
+	date, _ := el["release_date"].(string)
+	if date == "" {
+		date, _ = el["first_air_date"].(string)
+	}
+	if len(date) >= 4 {
+		year, _ = strconv.Atoi(date[:4])
+	}
+	if _, has := el["name"]; has {
+		typ = "tv"
+	} else {
+		typ = "movie"
+	}
+	return
+}
+
+// plateUnderFilters — плашка карточки должна проходить фильтры юзера:
+// проходящие остаются как есть; не проходящие перематчиваются по базе
+// топов с фильтрами (у фильма может быть 1080p, скрытый за озвученным
+// 720p/SD); нет подходящей раздачи — карточка выбывает
+func plateUnderFilters(el map[string]any, minq, voices string) bool {
+	q, _ := el["quality"].(string)
+	vv, _ := el["voice"].(string)
+
+	voiceSet := map[string]bool{}
+	for _, v := range strings.Split(voices, ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			voiceSet[v] = true
+		}
+	}
+
+	if cardQualityRank[q] >= minQualityRank(minq) && (len(voiceSet) == 0 || voiceSet[vv]) {
+		return true
+	}
+
+	query, orig, year, typ := cardFields(el)
+	it, found := findInTopBase(query, orig, year, typ, minq, voices)
+	if !found {
+		return false
+	}
+
+	el["quality"] = humanQuality(it.Quality)
+	if v := humanVoice(it); v != "" {
+		el["voice"] = v
+	} else {
+		delete(el, "voice")
+	}
+	return true
 }
 
 // errPoolBuilding — пул собирается (обычно прогревом): /feed отдаёт сырую
@@ -452,7 +522,7 @@ func buildPool(variant string) ([]map[string]any, error) {
 				typ = "tv"
 			}
 
-			it, found := findInTopBase(query, orig, year, typ)
+			it, found := findInTopBase(query, orig, year, typ, "", "")
 			if !found {
 				it, found = findWithCache2(query, orig, year, typ, "", "", true, true)
 			}
@@ -486,7 +556,7 @@ func buildPool(variant string) ([]map[string]any, error) {
 // реальные раздачи с плашками; фейки невышедших фильмов и прочее
 // нематченное не показывается вовсе. База недоступна — сырая страница
 // как раньше (лучше без плашек, чем пустой экран)
-func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool) ([]map[string]any, int, error) {
+func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string) ([]map[string]any, int, error) {
 	v, ok := tmdbVariants[variant]
 	if !ok {
 		return nil, 0, fmt.Errorf("unknown variant")
@@ -520,30 +590,10 @@ func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool) ([]ma
 			}
 
 			if baseOK {
-				query, _ := el["title"].(string)
-				if query == "" {
-					query, _ = el["name"].(string)
-				}
-				orig, _ := el["original_title"].(string)
-				if orig == "" {
-					orig, _ = el["original_name"].(string)
-				}
-				date, _ := el["release_date"].(string)
-				if date == "" {
-					date, _ = el["first_air_date"].(string)
-				}
-				year := 0
-				if len(date) >= 4 {
-					year, _ = strconv.Atoi(date[:4])
-				}
-				typ := "movie"
-				if _, has := el["name"]; has {
-					typ = "tv"
-				}
-
-				it, found := findInTopBase(query, orig, year, typ)
+				query, orig, year, typ := cardFields(el)
+				it, found := findInTopBase(query, orig, year, typ, minq, voices)
 				if !found {
-					continue // нет реальной раздачи — на building-страницу не берём
+					continue // нет подходящей раздачи — на building-страницу не берём
 				}
 				el["quality"] = humanQuality(it.Quality)
 				if vv := humanVoice(it); vv != "" {
@@ -596,28 +646,13 @@ func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, vo
 		return nil, 0, err
 	}
 
-	voiceSet := map[string]bool{}
-	for _, v := range strings.Split(voices, ",") {
-		if v = strings.TrimSpace(v); v != "" {
-			voiceSet[v] = true
-		}
-	}
-	needRank := minQualityRank(minq)
-
 	filtered := make([]map[string]any, 0, len(all))
 	for _, el := range all {
 		if idf, ok := el["id"].(float64); ok && exclude != nil && exclude[int(idf)] {
 			continue
 		}
-		q, _ := el["quality"].(string)
-		if cardQualityRank[q] < needRank {
+		if !plateUnderFilters(el, minq, voices) {
 			continue
-		}
-		if len(voiceSet) > 0 {
-			vv, _ := el["voice"].(string)
-			if !voiceSet[vv] {
-				continue
-			}
 		}
 		filtered = append(filtered, el)
 	}

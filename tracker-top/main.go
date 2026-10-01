@@ -703,7 +703,8 @@ func main() {
 		if errors.Is(err, errPoolBuilding) {
 			// пул собирается прогревом — сырая страница TMDB мгновенно,
 			// качество/озвучка появятся следующим открытием
-			if raw, tot, rerr := rawTMDBPage(variant, page, feedSize, exclude); rerr == nil {
+			if raw, tot, rerr := rawTMDBPage(variant, page, feedSize, exclude,
+				param(q, "minq", ""), param(q, "voice", "")); rerr == nil {
 				writeJSON(w, 200, map[string]any{
 					"page": page, "total_pages": tot, "results": raw, "building": true,
 				})
