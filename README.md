@@ -207,10 +207,13 @@ cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
 Optional: route the tracker-top container's outbound traffic (Jackett
 proxy, trackers, TMDB) through a VPS — the Mac's IP collects rate limits
 fast during heavy debugging. A plain SSH SOCKS tunnel is enough; Go's
-HTTP stack honours a socks5 proxy from the environment:
+HTTP stack honours a socks5 proxy from the environment. The tunnel is
+ephemeral: raise it for a debugging session and drop it after — with
+it down the dev container loses external fetches (pools hold on the
+disk cache):
 
 ```bash
-ssh -fN -D 127.0.0.1:1080 <vps>        # any VPS of yours
+ssh -fN -D 127.0.0.1:1080 <vps>     # any VPS you can ssh to
 docker run -d --name trackertop-dev -p 8355:8355 -v trackertop-dev-cache:/data \
     -e HTTP_PROXY=socks5://host.docker.internal:1080 \
     -e HTTPS_PROXY=socks5://host.docker.internal:1080 \
@@ -474,10 +477,12 @@ cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
 Опционально: вывод исходящего трафика tracker-top (Jackett-прокси, трекеры,
 TMDB) через свой VPS — IP мака при интенсивной отладке быстро набирает
 рейт-лимиты. Достаточно чистого SSH-SOCKS-туннеля — HTTP-стек Go понимает
-socks5-прокси из окружения:
+socks5-прокси из окружения. Туннель эпемерный: поднял на сессию отладки —
+опусти после; без него дев-контейнер теряет внешние запросы (пулы живут
+на дисковом кэше):
 
 ```bash
-ssh -fN -D 127.0.0.1:1080 <vps>        # любой свой VPS
+ssh -fN -D 127.0.0.1:1080 <vps>     # любой VPS с ssh-доступом
 docker run -d --name trackertop-dev -p 8355:8355 -v trackertop-dev-cache:/data \
     -e HTTP_PROXY=socks5://host.docker.internal:1080 \
     -e HTTPS_PROXY=socks5://host.docker.internal:1080 \
