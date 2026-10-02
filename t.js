@@ -21,6 +21,12 @@
         TorrServer/автозапуск. Ручной выбор ссылки уважается: изменили
         «Использовать ссылку» сами — bootstrap больше её не трогает
         (до повышения VERSION)
+      • протухшие значения переживает: нативное приложение (mx-сборка)
+        синхронизирует localStorage через CUB-аккаунт и может вкатить
+        в живую страницу старый облачный снапшот — мёртвые адреса
+        (moro.local, micro-tracker) ПОСЛЕ наших записей. Известный
+        мусор заменяем на актуальный при каждом старте и вотчдогом
+        каждые 15с; чужие/свои значения не трогаем
       • самолечение платформы Apple TV: если лампа определила платформу
         неверно (окно в момент старта было не 1920×1080 — тогда пункт
         «Настройки» с нативным меню пропадает), пересчитываем признак
@@ -41,8 +47,9 @@
     window[FLAG] = true
 
     // поднять после правки CONFIG — настройки применятся заново
-    // v13: в списке плагинов plex-sync
-    var VERSION = '14'
+    // v15: санитайзер мёртвых адресов + вотчдог против облачного
+    // синка localStorage нативного приложения
+    var VERSION = '15'
 
     // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
     // true — оба адреса выводятся из адреса страницы: плагины с того же
@@ -221,6 +228,50 @@
         })
     }
 
+    // мёртвые значения, которые облачный синк нативного приложения может
+    // вкатить обратно в живой webview ПОСЛЕ наших записей (снапшот CUB-аккаунта
+    // хранит их с прошлых экспериментов): заменяем на актуальные из CONFIG.
+    // Чужие значения (пользователь поставил свой сервер) не трогаем —
+    // совпадение точное, в списке только заведомо дохлое
+    var SANITIZE = {
+        torrserver_url: ['moro.local:8090', 'http://moro.local:8090', 'https://moro.local:8090'],
+        top_server_url: ['https://micro-tracker.koi-uaru.ts.net', 'https://micro-tracker.koi-uaru.ts.net/']
+    }
+
+    // читаем СЫРОЙ localStorage, не Storage.get: лампа кэширует значения
+    // в памяти (readed), и вкатанный синком мусор мимо кэша невидим —
+    // проверка по кэшу пропускала бы заражение. Запись — через
+    // Storage.set: обновит и кэш, и localStorage
+    function rawGet(key){
+        var v = null
+
+        try{ v = window.localStorage.getItem(key) }catch(e){}
+        if(v === null) return ''
+        try{ v = JSON.parse(v) }catch(e){}
+
+        return String(v)
+    }
+
+    function sanitize(){
+        for(var key in SANITIZE){
+            var cur = rawGet(key)
+
+            if(SANITIZE[key].indexOf(cur) > -1)
+                Lampa.Storage.set(key, CONFIG.storage[key] || TOP)
+        }
+
+        // платформа: синк может вернуть browser — нативные мосты и меню
+        // настроек умрут; сверяемся с сырой записью (кэш Storage тут
+        // слеп — Platform.get вернул бы старое значение и пропустил
+        // заражение), чиним молча
+        try{
+            if(rawGet('platform') !== 'apple_tv' && looksLikeAppleTV()){
+                Lampa.Storage.set('platform', 'apple_tv')
+                Lampa.Storage.set('native', true)
+            }
+        }catch(e){}
+    }
+
     // похоже ли на Apple TV по текущему состоянию (вызывается после
     // загрузки — размеры окна уже устоялись, в отличие от старта лампы);
     // «ontouchstart» отсекает настоящий iPad (у tvOS тача нет). Размер —
@@ -278,6 +329,20 @@
                 Lampa.Plugins.add({ url: plug.url, status: plug.status, author: '@0x3654' })
         })
 
+        // вычищенные адреса — при каждом старте, а не только после VERSION:
+        // облачный синк приложения может вернуть старый список плагинов
+        // (мёртвый top.js с адреса переименованного репо)
+        ;(CONFIG.plugins_remove || []).forEach(function(url){
+            var list = Lampa.Plugins.get()
+
+            for(var i = 0; i < list.length; i++){
+                if(list[i].url === url){ Lampa.Plugins.remove(list[i]); break }
+            }
+        })
+
+        // мёртвые адреса — сразу (и дальше по вотчдогу)
+        try{ sanitize() }catch(e){}
+
         // настройки — только при первом запуске (или после повышения VERSION)
         var MARKER = 'boot_ver'
         var LINK   = 'torrserver_use_link'
@@ -304,14 +369,6 @@
                     Lampa.Storage.set('menu_hide', names.concat(CONFIG.menu_hide_names || []))
                 }
 
-                ;(CONFIG.plugins_remove || []).forEach(function(url){
-                    var list  = Lampa.Plugins.get()
-
-                    for(var i = 0; i < list.length; i++){
-                        if(list[i].url === url){ Lampa.Plugins.remove(list[i]); break }
-                    }
-                })
-
                 Lampa.Storage.set(MARKER, VERSION)
                 Lampa.Storage.set(MEM, '') // вернуться к авто-выбору ссылки
 
@@ -319,6 +376,15 @@
             }
         }
         catch(e){ reload = true }
+
+        // вотчдог: облачный синк вкатывает старый снапшот и ПОСЛЕ загрузки
+        // страницы (в логах приложения — «applying diff snapshot to live
+        // webview» на каждом событии окна) — мёртвые адреса молча
+        // заменяем обратно, без перезагрузки: лампа читает их при каждом
+        // запросе, перезагрузочный цикл тут недопустим
+        setInterval(function(){
+            try{ sanitize() }catch(e){}
+        }, 15000)
 
         // платформа определилась неверно (не apple_tv), а по факту это она:
         // Platform.is читает localStorage при каждом вызове, поэтому

@@ -50,6 +50,7 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
       appready: !!window.appready,
       boot_ver: get('boot_ver'),
       top_server_url: get('top_server_url'),
+      torrserver_url: get('torrserver_url'),
       protocol: get('protocol'),
       menu_hidden: (get('menu_hide') || []).length,
       plugins: (get('plugins') || []).map(p => (p.url || '').split('/').pop()),
@@ -59,16 +60,30 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const fresh = await dump()
   console.log('fresh boot:', JSON.stringify(fresh))
 
-  // «вчерашний» браузер: кросс-портовый топ-сервер + https-протокол
+  // «вчерашний» браузер: кросс-портовый топ-сервер + https-протокол +
+  // мёртвые адреса из облачного снапшота CUB-аккаунта (сценарий TV:
+  // нативное приложение вкатывает старьё в живой webview)
   await page.evaluate(() => {
     localStorage.setItem('top_server_url', JSON.stringify('http://localhost:8355'))
     localStorage.setItem('protocol', JSON.stringify('https'))
+    localStorage.setItem('torrserver_url', JSON.stringify('moro.local:8090'))
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(15000)
 
   const healed = await dump()
   console.log('after poison + reload:', JSON.stringify(healed))
+
+  // вотчдог: синк вкатывает мусор ПОСЛЕ загрузки — t.js молча лечит
+  // без перезагрузки (тик 15с)
+  await page.evaluate(() => {
+    localStorage.setItem('torrserver_url', JSON.stringify('moro.local:8090'))
+    localStorage.setItem('top_server_url', JSON.stringify('https://micro-tracker.koi-uaru.ts.net/'))
+  })
+  await page.waitForTimeout(20000)
+
+  const afterWatchdog = await dump()
+  console.log('after cloud-stomp + watchdog:', JSON.stringify(afterWatchdog))
 
   // экраны Топа по-настоящему: открыть «Топ · трекеры» и «Топ · TMDB»
   // («Топ · TMDB» уже мог отработать главной на буте — push той же
@@ -111,6 +126,9 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const ok = fresh.appready && healed.appready
     && /\/topapi$/.test(healed.top_server_url || '')
     && healed.protocol === 'http'
+    && /^https:\/\/ru2/.test(healed.torrserver_url || '')
+    && /\/topapi$/.test(afterWatchdog.top_server_url || '')
+    && /^https:\/\/ru2/.test(afterWatchdog.torrserver_url || '')
     && healed.menu_hidden > 0
     && probe === 200
     && topapi.some(u => u.startsWith('200 /topapi/top'))
