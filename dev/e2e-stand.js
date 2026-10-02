@@ -85,6 +85,18 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const afterWatchdog = await dump()
   console.log('after cloud-stomp + watchdog:', JSON.stringify(afterWatchdog))
 
+  // reload-цикл (сценарий TV): синк удаляет boot_ver ДО маркера — повторное
+  // применение настроек обязано обойтись БЕЗ перезагрузки (стоп-флаг в
+  // sessionStorage, живёт через location.reload); считаем load-события
+  let loads = 0
+  page.on('load', () => loads++)
+  await page.evaluate(() => localStorage.removeItem('boot_ver'))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(12000) // бут + применение + потенциальный reload
+  const loopLoads = loads
+  const reapplied = await dump()
+  console.log('after boot_ver removal:', JSON.stringify({ loads: loopLoads, boot_ver: reapplied.boot_ver }))
+
   // экраны Топа по-настоящему: открыть «Топ · трекеры» и «Топ · TMDB»
   // («Топ · TMDB» уже мог отработать главной на буте — push той же
   // активности лампа дедупит, поэтому /feed ловим и на буте тоже)
@@ -129,6 +141,8 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
     && /^https:\/\/ru2/.test(healed.torrserver_url || '')
     && /\/topapi$/.test(afterWatchdog.top_server_url || '')
     && /^https:\/\/ru2/.test(afterWatchdog.torrserver_url || '')
+    && loopLoads === 1 // одна ручная перезагрузка, без цикла
+    && String(reapplied.boot_ver || '') !== ''
     && healed.menu_hidden > 0
     && probe === 200
     && topapi.some(u => u.startsWith('200 /topapi/top'))

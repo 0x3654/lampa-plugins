@@ -49,7 +49,9 @@
     // поднять после правки CONFIG — настройки применятся заново
     // v15: санитайзер мёртвых адресов + вотчдог против облачного
     // синка localStorage нативного приложения
-    var VERSION = '15'
+    // v16: reload максимум раз за сессию (sessionStorage) — синк вкатывает
+    // снапшот раньше маркера и reload по «boot_ver пропал» шёл циклом
+    var VERSION = '16'
 
     // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
     // true — оба адреса выводятся из адреса страницы: плагины с того же
@@ -406,8 +408,21 @@
         var cur     = String(Lampa.Storage.get(LINK) || '')
         var written = String(Lampa.Storage.get(MEM) || '')
 
+        // перезагрузка — максимум РАЗ за сессию: облачный синк вкатывает
+        // снапшот раньше нашего маркера, и reload по «boot_ver пропал»
+        // превращался в цикл каждые 5с (значения при этом чинятся
+        // молча — sanitize). Маркер в sessionStorage: синк трогает
+        // только localStorage и живёт дольше одного location.reload
         function done(){
-            if(reload) setTimeout(function(){ window.location.reload() }, 700)
+            if(!reload) return
+
+            try{
+                if(sessionStorage.getItem('__lampa_boot_rl')) return
+                sessionStorage.setItem('__lampa_boot_rl', '1')
+            }
+            catch(e){}
+
+            setTimeout(function(){ window.location.reload() }, 700)
         }
 
         if(!written || cur === written){
@@ -417,7 +432,9 @@
                         Lampa.Storage.set(LINK, link)
                         Lampa.Storage.set(MEM, link)
 
-                        reload = true
+                        // ссылка реально сменилась — страницу перезагрузить
+                        // нужно; повторная запись того же значения — нет
+                        if(link !== cur) reload = true
                     }
                     catch(e){}
                 }

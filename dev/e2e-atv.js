@@ -74,7 +74,7 @@ const DUMP_FN = () => {
 
   const ok = boot.platform === 'apple_tv'
     && boot.native === true
-    && String(boot.boot_ver) === '15'
+    && String(boot.boot_ver || '') !== ''
     && boot.use_link === 'two'
     && probe === 200
     && /^https:\/\/ru2/.test(boot.torrserver_url || '')
