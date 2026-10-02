@@ -166,8 +166,13 @@
     if(dev) CONFIG.plugins.push({ url: BASE + '/t.js', status: 1 })
 
     // отвечает ли локальный TorrServer (встроенный в приложение)
+    // проба — GET /echo: живой эндпоинт TorrServer с CORS-заголовками.
+    // Голый корень («HEAD /») встроенный в приложение сервер может
+    // отдавать редиректом или без ACAO — проба падала и ссылка каждый
+    // старт слетала на основную (в lampa.mx пробы нет вовсе — потому
+    // там встроенный и работал)
     function probeLocal(cb){
-        var tries = 2
+        var tries = 3
 
         ;(function attempt(){
             var xhr = new XMLHttpRequest()
@@ -178,11 +183,11 @@
                 done = true
 
                 if(alive || !--tries) cb(alive)
-                else setTimeout(attempt, 400)
+                else setTimeout(attempt, 700)
             }
 
-            xhr.open('HEAD', 'http://127.0.0.1:8090', true)
-            xhr.timeout = 1200
+            xhr.open('GET', 'http://127.0.0.1:8090/echo', true)
+            xhr.timeout = 1500
             xhr.onload = function(){ finish(xhr.status > 0) }
             xhr.onerror = xhr.ontimeout = function(){ finish(false) }
 
@@ -204,7 +209,16 @@
 
         if(!local) return cb('one')
 
-        probeLocal(function(alive){ cb(alive ? 'two' : 'one') })
+        // «липкая» двойка: если встроенный уже выбран, неудачная проба на
+        // старте его не сбрасывает (сервер в приложении может отвечать
+        // позже пробы) — lampa сама покажет ошибку, если он реально мёртв;
+        // удачная проба всегда возвращает встроенный
+        var cur = ''
+        try{ cur = String(Lampa.Storage.get('torrserver_use_link') || '') }catch(e){}
+
+        probeLocal(function(alive){
+            cb(alive || cur === 'two' ? 'two' : 'one')
+        })
     }
 
     // похоже ли на Apple TV по текущему состоянию (вызывается после
