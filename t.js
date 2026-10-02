@@ -262,6 +262,14 @@
                 Lampa.Storage.set(key, CONFIG.storage[key] || TOP)
         }
 
+        // protocol: лампа хранит протокол страницы, где её открывали;
+        // протухший http (остался с экспериментов по http-адресу) на
+        // https-странице ломает сборку URL без схемы (mixed content)
+        try{
+            if(window.location.protocol === 'https:' && rawGet('protocol') === 'http')
+                Lampa.Storage.set('protocol', 'https')
+        }catch(e){}
+
         // платформа: синк может вернуть browser — нативные мосты и меню
         // настроек умрут; сверяемся с сырой записью (кэш Storage тут
         // слеп — Platform.get вернул бы старое значение и пропустил
