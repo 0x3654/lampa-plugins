@@ -455,6 +455,68 @@
             })
         }
         else done()
+
+        // свежий origin (первое включение http-адреса, чистка данных):
+        // нативное приложение восстанавливает localStorage ПОСЛЕ своего
+        // чека автозапуска TorrServer — ключи приезжают с опозданием,
+        // TSBridge решает «флаг false» и сервер не поднимается. Если
+        // автозапуск включён, а проба мертва — перезагрузка даёт нативу
+        // второй чек (свой одноразовый флаг на сессию)
+        setTimeout(function(){
+            if(!looksLikeAppleTV()) return
+
+            probeLocal(function(alive){
+                if(alive) return
+
+                var auto = rawGet('ts_autostart') === 'true' || rawGet('autostartMatrixOnBoot') === 'true'
+                if(!auto) return
+
+                try{
+                    if(sessionStorage.getItem('__lampa_boot_ts')) return
+                    sessionStorage.setItem('__lampa_boot_ts', '1')
+                }
+                catch(e){}
+
+                window.location.reload()
+            })
+        }, 12000)
+    }
+
+    // диагностика по маркеру ?tsdiag: статус обеих ссылок TorrServer
+    // одной плашкой (Noty пишется и в лог нативного приложения) —
+    // проверка на TV без пульта в руках: грузим адрес с маркером
+    // и читаем результат в console.txt приложения или на экране
+    if(/(^|[?&])tsdiag/.test(window.location.search)){
+        Lampa.Listener.follow('app', function(e){
+            if(e.type !== 'ready') return
+
+            setTimeout(function(){
+                var lines = []
+
+                var norm = function(u, cb){
+                    u = String(u || '')
+                    if(u && u.indexOf('://') === -1) u = 'http://' + u
+                    cb(u)
+                }
+
+                var probe = function(name, u, next){
+                    norm(u, function(url){
+                        var xhr = new XMLHttpRequest()
+                        xhr.open('GET', url.replace(/\/$/, '') + '/echo', true)
+                        xhr.timeout = 4000
+                        xhr.onload = function(){ lines.push(name + ' ' + xhr.status); next() }
+                        xhr.onerror = xhr.ontimeout = function(){ lines.push(name + ' FAIL'); next() }
+                        try{ xhr.send() }catch(e){ lines.push(name + ' FAIL'); next() }
+                    })
+                }
+
+                probe('TS1:', Lampa.Storage.get('torrserver_url'), function(){
+                    probe('TS2:', 'http://127.0.0.1:8090', function(){
+                        Lampa.Noty.show('tsdiag · ' + lines.join(' · '), {time: 20000})
+                    })
+                })
+            }, 25000)
+        })
     }
 
     if(window.appready) init()
