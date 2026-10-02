@@ -262,12 +262,16 @@
                 Lampa.Storage.set(key, CONFIG.storage[key] || TOP)
         }
 
-        // protocol: лампа хранит протокол страницы, где её открывали;
-        // протухший http (остался с экспериментов по http-адресу) на
-        // https-странице ломает сборку URL без схемы (mixed content)
+        // protocol: лампа строит абсолютные URL из storage 'protocol' —
+        // он обязан совпадать с протоколом СТРАНИЦЫ. Протухший http на
+        // https-странице ломает URL без схемы (mixed content), а https
+        // на http-странице (клон для TV-приложения) шлёт TLS-хендшейки
+        // в http-nginx («нет подключения»)
         try{
-            if(window.location.protocol === 'https:' && rawGet('protocol') === 'http')
-                Lampa.Storage.set('protocol', 'https')
+            var pageProto = window.location.protocol === 'https:' ? 'https' : 'http'
+
+            if(rawGet('protocol') !== pageProto)
+                Lampa.Storage.set('protocol', pageProto)
         }catch(e){}
 
         // платформа: синк может вернуть browser — нативные мосты и меню
