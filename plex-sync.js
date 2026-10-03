@@ -857,7 +857,7 @@
             var box = $(
                 '<div class="about" style="text-align:center">' +
                     '<div class="plex-pin-code" style="font-size:1.8em;letter-spacing:.25em;font-weight:300;word-break:break-word;padding:0 .6em">— — — —</div>' +
-                    '<div class="plex-pin-qr" style="margin-top:1.2em;display:inline-block;background:#fff;padding:10px;border-radius:8px"></div>' +
+                    '<div class="plex-pin-qr" style="margin-top:1.2em;width:190px;height:190px;background:#fff;padding:10px;border-radius:8px;flex:0 0 auto;align-self:center"></div>' +
                     '<div style="margin-top:1.4em;opacity:.8">' + T('code_enter') + '</div>' +
                     '<div style="margin-top:1.4em;opacity:.4" class="plex-pin-timer"></div>' +
                 '</div>'
@@ -900,13 +900,32 @@
                 // прямой <img>, blob: и data: по-разному не красятся в
                 // Safari и webview tvOS, inline-SVG красится везде
                 if(pin.code){
+                    var qrbox = box.find('.plex-pin-qr')
+
                     try{
                         Lampa.Utils.qrcode(
                             'https://www.plex.tv/link/?pin=' + pin.code,
-                            box.find('.plex-pin-qr')
+                            qrbox,
+                            function(){
+                                // библиотека не загрузилась — прячем ящик,
+                                // а не показываем пустой белый прямоугольник;
+                                // код привязки остаётся текстом выше
+                                qrbox.hide()
+                            }
                         )
+
+                        // модули строго чёрные инлайном: CSS темы умеет
+                        // перекрашивать svg (иконки), fill атрибутом он
+                        // бьётся, инлайн-стилем — нет; svg вписываем
+                        // в фиксированный бокс — без этого флекс-модалка
+                        // растягивает его подложку на всю высоту
+                        qrbox.find('svg').css({ width: '100%', height: '100%', display: 'block' })
+                        qrbox.find('path').css({ fill: '#000' })
+                        qrbox.find('rect').css({ fill: '#fff' })
                     }
-                    catch(e){}
+                    catch(e){
+                        qrbox.hide()
+                    }
                 }
 
                 left = (pin.expiresIn && parseInt(pin.expiresIn, 10)) || 900

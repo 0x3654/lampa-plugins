@@ -71,7 +71,10 @@ sandbox.$ = function(html){
     const el = { codeShown: '', timerShown: '' }
     el.find = (sel) => ({
         text: (t) => { if(sel === '.plex-pin-code'){ el.codeShown = t; state.pinShown = t } },
-        html: (v) => { if(sel === '.plex-pin-qr' && v) state.qrHtml = v }
+        html: (v) => { if(sel === '.plex-pin-qr' && v) state.qrHtml = v },
+        // find('svg'/'path'/'rect') от QR-рендера: пустые заглушки стилей
+        css(){ return this },
+        hide(){}
     })
     return el
 }
