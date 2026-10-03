@@ -180,6 +180,36 @@
             return field(name) === 'true' ? T('yes') : T('no')
         }
 
+        // тач-устройствам недоступен onRight (пульт/стрелки) — плашка
+        // «Фильтры» поверх экрана, открывает тот же лист настроек;
+        // снимается при закрытии экрана (render() у InteractionCategory
+        // ленивый, в дерево экрана надёжно не воткнуть)
+        function touchFilterChip(comp){
+            try{
+                if(!('ontouchstart' in window)) return
+
+                var btn = document.createElement('div')
+
+                btn.className = 'selector top-touch-filter'
+                btn.textContent = T('filters')
+
+                window.$(btn).on('hover:enter', function(){
+                    if(typeof comp.onRight === 'function') comp.onRight()
+                })
+
+                document.body.appendChild(btn)
+
+                var origDestroy = comp.destroy
+
+                comp.destroy = function(){
+                    try{ btn.remove() }catch(e){}
+
+                    return origDestroy ? origDestroy.apply(comp, arguments) : undefined
+                }
+            }
+            catch(e){}
+        }
+
         // rows: {title, values, key} | {title, toggle} | {title, go} | {title, variants}
         function filterSheet(rows, apply){
             Lampa.Select.show({
@@ -528,6 +558,8 @@
                 })
             }
 
+            touchFilterChip(comp)
+
             return comp
         }
 
@@ -704,6 +736,7 @@
                 var style = document.createElement('style')
                 style.textContent = '.top-badge{position:absolute;top:8px;left:8px;z-index:3;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:rgba(22,140,70,.92);color:#fff;font-size:13px;font-weight:700}'
                     + '.top-badge--voice{left:auto;right:8px;width:auto;min-width:22px;height:auto;line-height:1.2;padding:3px 7px;border-radius:4px;background:rgba(30,90,170,.92);font-size:11px}'
+                    + '.top-touch-filter{position:fixed;top:calc(env(safe-area-inset-top, 0px) + 66px);right:10px;z-index:20;padding:8px 14px;border-radius:20px;background:rgba(30,30,30,.9);color:#ddd;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.4)}'
                 document.head.appendChild(style)
             }
             catch(e){}
@@ -1094,6 +1127,8 @@
                     })
                 })
             }
+
+            touchFilterChip(comp)
 
             return comp
         }
