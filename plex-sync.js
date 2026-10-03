@@ -916,7 +916,12 @@
                                     )
                                 }
 
-                                fr.readAsDataURL(new Blob([xhr.response]))
+                                // тип обязателен: без него data: выходит
+                                // application/octet-stream, и строгие
+                                // WebKit'и (Safari/tvOS) картинку не красят
+                                var ctype = (xhr.getResponseHeader('content-type') || '').split(';')[0]
+
+                                fr.readAsDataURL(new Blob([xhr.response], { type: ctype || 'image/png' }))
                             }
 
                             xhr.send()
