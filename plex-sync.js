@@ -857,7 +857,7 @@
             var box = $(
                 '<div class="about" style="text-align:center">' +
                     '<div class="plex-pin-code" style="font-size:1.8em;letter-spacing:.25em;font-weight:300;word-break:break-word;padding:0 .6em">— — — —</div>' +
-                    '<div class="plex-pin-qr" style="margin-top:1.2em;width:190px;height:190px;background:#fff;padding:10px;border-radius:8px;flex:0 0 auto;align-self:center"></div>' +
+                    '<div class="plex-pin-qr" style="margin:1.2em auto 0;width:190px;height:190px;background:#fff;padding:10px;border-radius:8px;flex:0 0 auto;align-self:center"></div>' +
                     '<div style="margin-top:1.4em;opacity:.8">' + T('code_enter') + '</div>' +
                     '<div style="margin-top:1.4em;opacity:.4" class="plex-pin-timer"></div>' +
                 '</div>'
