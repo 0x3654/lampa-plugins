@@ -38,9 +38,10 @@ class FakeXHR {
 
         for(const r of state.xhrRoutes){
             if(r.match(this.url, this.method)){
-                const { status, json } = r.reply
+                const { status, json, raw } = r.reply
                 this.status = status
-                this.responseText = JSON.stringify(json)
+                if(raw !== undefined) this.response = raw
+                else this.responseText = JSON.stringify(json)
                 this.onload()
                 return
             }
@@ -58,12 +59,12 @@ const sandbox = {
     XMLHttpRequest: FakeXHR,
     setInterval(fn){ const id = state.nextInterval++; state.intervals[id] = fn; return id },
     clearInterval(id){ delete state.intervals[id] },
-    // синхронный thenable для fetch→blob QR (assert работает без микротасков)
-    fetch(url){ const ok = { blob: () => syncThenable({ type: 'image/png' }) }; return syncThenable(ok) },
-    URL: { createObjectURL(){ return 'blob:qr-test' } },
+    // QR красится через XHR→FileReader→data: URL (blob: даёт белый квадрат
+    // в WebKit'ах) — моки синхронные, assert работает без микротасков
+    Blob: class { constructor(parts){ this.parts = parts } },
+    FileReader: class { readAsDataURL(){ this.result = 'data:image/png;base64,UUVEQ0FERQ=='; this.onload() } },
     window: null
 }
-function syncThenable(v){ return { then(fn){ if(fn) fn(v); return syncThenable(v) } } }
 sandbox.window = sandbox
 sandbox.appready = true
 
@@ -138,6 +139,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     let pinPolls = 0
 
     route((url, method) => method === 'POST' && url.includes('/api/v2/pins'), { status: 201, json: { id: 12345, code: 'DWZX', expiresIn: 900, qr: 'https://plex.tv/api/v2/pins/qr/DWZX' } })
+    route((url) => url.includes('/pins/qr/'), { status: 200, raw: 'PNGDATA' })
     route((url) => url.includes('/pins/12345'), {
         status: 200,
         json: { get authToken(){ return ++pinPolls > 1 ? 'TOKEN-1' : '' } }
@@ -148,7 +150,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     param('plex_link').onChange()
 
     assert.strictEqual(calls.modal.length, 1, 'модалка с кодом открыта')
-    assert.ok(String(state.qrHtml || '').includes('<img') && String(state.qrHtml || '').includes('blob:'), 'QR активации вставлен в модалку (blob-картинка)')
+    assert.ok(String(state.qrHtml || '').includes('<img') && String(state.qrHtml || '').includes('data:image/png'), 'QR активации вставлен в модалку (data:-картинка — blob:/прямой src дают белый квадрат в WebKit)')
 
     tick() // первый поллинг: authToken пуст
     tick() // второй: authToken выдан
@@ -160,7 +162,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     assert.ok(calls.noty.some(n => n.text === 'plex_no_server'), 'авто-синк после привязки стартовал (сервера нет — честная ошибка)')
     const pinPost = calls.xhr.find(x => x.method === 'POST' && x.url.includes('/api/v2/pins'))
     assert.ok(pinPost && !/strong/.test(pinPost.url), 'PIN без strong — короткий код, какой принимает plex.tv/link')
-    assert.ok(calls.xhr.every(x => x.headers['x-plex-client-identifier']), 'Client-Identifier на запросах к plex.tv')
+    assert.ok(calls.xhr.every(x => !x.url.includes('plex.tv') || x.url.includes('/pins/qr/') || x.headers['x-plex-client-identifier']), 'Client-Identifier на запросах к plex.tv (кроме картинки QR)')
     console.log('✓ PIN: модалка → 4-символьный код (без strong) → поллинг → токен сохранён → авто-синк')
 }
 

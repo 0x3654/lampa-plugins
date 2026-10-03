@@ -894,19 +894,35 @@
                 box.find('.plex-pin-code').text(formatCode(pin.code))
 
                 // QR активации: plex.tv отдаёт PNG под код — телефон сканирует
-                // и сразу попадает на страницу ввода. Грузим через fetch→blob:
-                // тот же канал, что пуллинг PIN, — прямой <img src> на tvOS
-                // не всегда красится
+                // и сразу попадает на страницу ввода. Красим через data:-URL
+                // (XHR→FileReader): прямой <img src> и blob: дают белый
+                // квадрат в допотопном webview tvOS, data: красится везде
                 if(pin.qr){
-                    try{
-                        fetch(pin.qr).then(function(r){ return r.blob() }).then(function(b){
-                            var src = URL.createObjectURL(b)
+                    ;(function(){
+                        try{
+                            var xhr = new XMLHttpRequest()
 
-                            box.find('.plex-pin-qr').html(
-                                '<img src="' + src + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
-                            )
-                        }).catch(function(){})
-                    }catch(e){}
+                            xhr.open('GET', pin.qr, true)
+                            xhr.responseType = 'arraybuffer'
+
+                            xhr.onload = function(){
+                                if(xhr.status !== 200 || !xhr.response) return
+
+                                var fr = new FileReader()
+
+                                fr.onload = function(){
+                                    box.find('.plex-pin-qr').html(
+                                        '<img src="' + fr.result + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
+                                    )
+                                }
+
+                                fr.readAsDataURL(new Blob([xhr.response]))
+                            }
+
+                            xhr.send()
+                        }
+                        catch(e){}
+                    })()
                 }
 
                 left = (pin.expiresIn && parseInt(pin.expiresIn, 10)) || 900
