@@ -49,9 +49,12 @@
     // поднять после правки CONFIG — настройки применятся заново
     // v15: санитайзер мёртвых адресов + вотчдог против облачного
     // синка localStorage нативного приложения
-    // v16: reload максимум раз за сессию (sessionStorage) — синк вкатывает
-    // снапшот раньше маркера и reload по «boot_ver пропал» шёл циклом
-    var VERSION = '16'
+    // v16: reload по защёлке сессии — не держала (sessionStorage в
+    // webview приложения reload не переживает)
+    // v17: применение настроек молчаливое (без reload вовсе), ссылка
+    // TorrServer — тоже; reload только для починки платформы и
+    // автозапуска TS, не чаще раза в 90с по метке-таймстампу
+    var VERSION = '17'
 
     // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
     // true — оба адреса выводятся из адреса страницы: плагины с того же
@@ -357,11 +360,15 @@
         // мёртвые адреса — сразу (и дальше по вотчдогу)
         try{ sanitize() }catch(e){}
 
-        // настройки — только при первом запуске (или после повышения VERSION)
+        // настройки — при первом запуске (или после повышения VERSION);
+        // ПРИМЕНЕНИЕ МОЛЧАЛИВОЕ: перезагрузки по «маркер пропал» были
+        // источником кругов — облачный синк приложения удаляет маркер
+        // ПОСЛЕ каждой загрузки, и reload возвращался снова и снова.
+        // Лампа читает почти все ключи при каждом обращении, до
+        // применённого с первого раза menu_hide доживёт следующий старт
         var MARKER = 'boot_ver'
         var LINK   = 'torrserver_use_link'
         var MEM    = 'boot_link_written'
-        var reload = false
 
         try{
             // Storage лампы JSON-кодирует значения: get('5') вернёт ЧИСЛО 5,
@@ -385,11 +392,9 @@
 
                 Lampa.Storage.set(MARKER, VERSION)
                 Lampa.Storage.set(MEM, '') // вернуться к авто-выбору ссылки
-
-                reload = true
             }
         }
-        catch(e){ reload = true }
+        catch(e){}
 
         // вотчдог: облачный синк вкатывает старый снапшот и ПОСЛЕ загрузки
         // страницы (в логах приложения — «applying diff snapshot to live
@@ -400,42 +405,44 @@
             try{ sanitize() }catch(e){}
         }, 15000)
 
+        // перезагрузка — не чаще раза в 90с, метка-таймстамп в localStorage:
+        // sessionStorage в webview приложения reload не переживает (защёлка
+        // v16 не держала, цикл возвращался). Метку пишем ДО перезагрузки;
+        // даже если синк удалит её после — окно 90с рвёт любой цикл
+        function reloadCooled(){
+            var last = 0
+
+            try{ last = parseInt(rawGet('boot_last_reload'), 10) || 0 }catch(e){}
+
+            if(Date.now() - last < 90000) return false
+
+            try{ Lampa.Storage.set('boot_last_reload', Date.now()) }catch(e){}
+            return true
+        }
+
         // платформа определилась неверно (не apple_tv), а по факту это она:
         // Platform.is читает localStorage при каждом вызове, поэтому
-        // достаточно записать значение — пункт нативного меню вернётся
+        // достаточно записать значение; перезагрузка (одна, с window 90с)
+        // нужна, чтобы главное меню с нативной папкой построилось заново
         try{
-            if(Lampa.Platform.get() !== 'apple_tv' && looksLikeAppleTV()){
+            if(rawGet('platform') !== 'apple_tv' && looksLikeAppleTV()){
                 Lampa.Storage.set('platform', 'apple_tv')
                 // нативный флаг лампы ставился в false при провале детекта —
                 // без него нативные мосты (lampa://…) не работают
                 Lampa.Storage.set('native', true)
 
-                reload = true
+                if(reloadCooled())
+                    setTimeout(function(){ window.location.reload() }, 700)
             }
         }
         catch(e){}
 
         // активная ссылка TorrServer — пробой при каждом запуске;
-        // значение, изменённое не нами, трогаем только после VERSION
+        // значение, изменённое не нами, трогаем только после VERSION.
+        // Без перезагрузки: Torserver.url() читает storage на каждом
+        // запросе, следущая раздача уже пойдёт по новой ссылке
         var cur     = String(Lampa.Storage.get(LINK) || '')
         var written = String(Lampa.Storage.get(MEM) || '')
-
-        // перезагрузка — максимум РАЗ за сессию: облачный синк вкатывает
-        // снапшот раньше нашего маркера, и reload по «boot_ver пропал»
-        // превращался в цикл каждые 5с (значения при этом чинятся
-        // молча — sanitize). Маркер в sessionStorage: синк трогает
-        // только localStorage и живёт дольше одного location.reload
-        function done(){
-            if(!reload) return
-
-            try{
-                if(sessionStorage.getItem('__lampa_boot_rl')) return
-                sessionStorage.setItem('__lampa_boot_rl', '1')
-            }
-            catch(e){}
-
-            setTimeout(function(){ window.location.reload() }, 700)
-        }
 
         if(!written || cur === written){
             pickLink(function(link){
@@ -443,25 +450,18 @@
                     try{
                         Lampa.Storage.set(LINK, link)
                         Lampa.Storage.set(MEM, link)
-
-                        // ссылка реально сменилась — страницу перезагрузить
-                        // нужно; повторная запись того же значения — нет
-                        if(link !== cur) reload = true
                     }
                     catch(e){}
                 }
-
-                done()
             })
         }
-        else done()
 
         // свежий origin (первое включение http-адреса, чистка данных):
         // нативное приложение восстанавливает localStorage ПОСЛЕ своего
         // чека автозапуска TorrServer — ключи приезжают с опозданием,
         // TSBridge решает «флаг false» и сервер не поднимается. Если
         // автозапуск включён, а проба мертва — перезагрузка даёт нативу
-        // второй чек (свой одноразовый флаг на сессию)
+        // второй чек (окно 90с — не чаще)
         setTimeout(function(){
             if(!looksLikeAppleTV()) return
 
@@ -471,13 +471,7 @@
                 var auto = rawGet('ts_autostart') === 'true' || rawGet('autostartMatrixOnBoot') === 'true'
                 if(!auto) return
 
-                try{
-                    if(sessionStorage.getItem('__lampa_boot_ts')) return
-                    sessionStorage.setItem('__lampa_boot_ts', '1')
-                }
-                catch(e){}
-
-                window.location.reload()
+                if(reloadCooled()) window.location.reload()
             })
         }, 12000)
     }
