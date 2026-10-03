@@ -54,7 +54,9 @@
     // v17: применение настроек молчаливое (без reload вовсе), ссылка
     // TorrServer — тоже; reload только для починки платформы и
     // автозапуска TS, не чаще раза в 90с по метке-таймстампу
-    var VERSION = '17'
+    // v18: etor (cub.red) заменён собственными флагами — минус чужой
+    // хост из бутстрапа; плагин tmdb-proxy cub оставлен
+    var VERSION = '18'
 
     // dev-контур (локальная лампа): window.TJS_DEV = true | {plugins,top}
     // true — оба адреса выводятся из адреса страницы: плагины с того же
@@ -83,10 +85,8 @@
         plugins: [
             { url: BASE + '/top.js', status: 1 },
             { url: BASE + '/transmission-send.js', status: 1 },
-            // etor — «разблокировщик торрентов»: включает torrents_use
-            // (возвращает «Парсер»/«TorrServer» в сторовских сборках)
-            { url: 'http://cub.red/plugin/etor', status: 1 },
-            // прокси TMDB через cub (устойчивость к блокировкам)
+            // прокси TMDB через cub (устойчивость к блокировкам) — единственный
+            // чужой плагин: включение торрентов и пр. больше не тянем с cub.red
             { url: 'http://cub.red/plugin/tmdb-proxy', status: 1 },
             // Plex Sync — статус просмотра Lampa ↔ аккаунт Plex
             { url: BASE + '/plex-sync.js', status: 1 }
@@ -97,10 +97,12 @@
         // с настройками — ручная установка позже не трогается);
         // v12: старые адреса репо transmission-send (репозиторий переименован
         // в lampa-plugins, Pages старого имени не редиректится)
+        // v18: etor cub — флаги включения торрентов теперь ставим сами
         plugins_remove: [
             'https://0x3654.github.io/transmission-send/top.js',
             'https://0x3654.github.io/transmission-send/transmission-send.js',
-            'https://0x3654.github.io/transmission-send/nnm-auto.js'
+            'https://0x3654.github.io/transmission-send/nnm-auto.js',
+            'http://cub.red/plugin/etor'
         ],
 
         storage: {
@@ -348,7 +350,8 @@
 
         // вычищенные адреса — при каждом старте, а не только после VERSION:
         // облачный синк приложения может вернуть старый список плагинов
-        // (мёртвый top.js с адреса переименованного репо)
+        // (мёртвый top.js с адреса переименованного репо; etor cub — заменён
+        // флагами ниже)
         ;(CONFIG.plugins_remove || []).forEach(function(url){
             var list = Lampa.Plugins.get()
 
@@ -356,6 +359,16 @@
                 if(list[i].url === url){ Lampa.Plugins.remove(list[i]); break }
             }
         })
+
+        // включение торрентов в сторовских сборках — сами, без плагина etor
+        // с cub.red (весь их «разблокировщик» — ровно эти три строки);
+        // в вебе флаги уже true и это ничего не меняет
+        try{
+            window.lampa_settings.torrents_use = true
+            window.lampa_settings.demo        = false
+            window.lampa_settings.read_only   = false
+        }
+        catch(e){}
 
         // мёртвые адреса — сразу (и дальше по вотчдогу)
         try{ sanitize() }catch(e){}
