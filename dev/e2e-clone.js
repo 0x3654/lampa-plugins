@@ -33,6 +33,8 @@ const ATV_UA = 'Mozilla/5.0 (iPad; CPU OS 26_6 like Mac OS X) AppleWebKit/605.1.
     // аналитика / реклама / гео cub
     if (/\/api\/(ad\/get|metric)\//.test(u)) bad.push(u.slice(0, 90))
     if (/^https?:\/\/geo\./.test(u)) bad.push(u.slice(0, 90))
+    // Shots вырезан целиком — скрипт не должен грузиться даже about:blank'ом
+    if (/\/plugin\/shots/.test(u)) bad.push(u.slice(0, 90))
     // их включатель торрентов больше не ставится
     if (/cub\.red\/plugin\/etor/.test(u)) bad.push(u.slice(0, 90))
     // метки чужим хостам
