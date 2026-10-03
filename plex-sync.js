@@ -857,7 +857,7 @@
             var box = $(
                 '<div class="about" style="text-align:center">' +
                     '<div class="plex-pin-code" style="font-size:1.8em;letter-spacing:.25em;font-weight:300;word-break:break-word;padding:0 .6em">— — — —</div>' +
-                    '<div class="plex-pin-qr" style="margin-top:1.2em"></div>' +
+                    '<div class="plex-pin-qr" style="margin-top:1.2em;display:inline-block;background:#fff;padding:10px;border-radius:8px"></div>' +
                     '<div style="margin-top:1.4em;opacity:.8">' + T('code_enter') + '</div>' +
                     '<div style="margin-top:1.4em;opacity:.4" class="plex-pin-timer"></div>' +
                 '</div>'
@@ -893,41 +893,20 @@
 
                 box.find('.plex-pin-code').text(formatCode(pin.code))
 
-                // QR активации: plex.tv отдаёт PNG под код — телефон сканирует
-                // и сразу попадает на страницу ввода. Красим через data:-URL
-                // (XHR→FileReader): прямой <img src> и blob: дают белый
-                // квадрат в допотопном webview tvOS, data: красится везде
-                if(pin.qr){
-                    ;(function(){
-                        try{
-                            var xhr = new XMLHttpRequest()
-
-                            xhr.open('GET', pin.qr, true)
-                            xhr.responseType = 'arraybuffer'
-
-                            xhr.onload = function(){
-                                if(xhr.status !== 200 || !xhr.response) return
-
-                                var fr = new FileReader()
-
-                                fr.onload = function(){
-                                    box.find('.plex-pin-qr').html(
-                                        '<img src="' + fr.result + '" alt="plex.tv/link" style="width:170px;height:170px;background:#fff;padding:8px;border-radius:8px">'
-                                    )
-                                }
-
-                                // тип обязателен: без него data: выходит
-                                // application/octet-stream, и строгие
-                                // WebKit'и (Safari/tvOS) картинку не красят
-                                var ctype = (xhr.getResponseHeader('content-type') || '').split(';')[0]
-
-                                fr.readAsDataURL(new Blob([xhr.response], { type: ctype || 'image/png' }))
-                            }
-
-                            xhr.send()
-                        }
-                        catch(e){}
-                    })()
+                // QR активации: plex.tv шифрует в QR адрес
+                // https://www.plex.tv/link/?pin=<код> (проверено декодером)
+                // — рисуем его САМИ inline-SVG через вендорную библиотеку
+                // лампы (Utils.qrcode). Картинку с plex.tv не тянем вовсе:
+                // прямой <img>, blob: и data: по-разному не красятся в
+                // Safari и webview tvOS, inline-SVG красится везде
+                if(pin.code){
+                    try{
+                        Lampa.Utils.qrcode(
+                            'https://www.plex.tv/link/?pin=' + pin.code,
+                            box.find('.plex-pin-qr')
+                        )
+                    }
+                    catch(e){}
                 }
 
                 left = (pin.expiresIn && parseInt(pin.expiresIn, 10)) || 900
