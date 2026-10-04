@@ -577,7 +577,7 @@
             Lampa.SettingsApi.addComponent({
                 component: 'offline',
                 icon: ico_offline,
-                name: T('offline_title')
+                name: Lampa.Storage.get('language') === 'en' ? 'Downloads' : 'Загрузки'
             })
 
             Lampa.SettingsApi.addParam({
@@ -596,24 +596,27 @@
                 }
             })
 
-            // страница настроек открылась — рисуем список
-            Lampa.Settings.listener.follow('page', function(e){
+            // страница блока открылась — рисуем список прямо в тело
+            Lampa.Settings.listener.follow('open', function(e){
                 if(e.name !== 'offline' || !e.body) return
-                offlineRenderList()
+
+                var holder = $('#offline_list')
+                if(!holder.length){
+                    holder = $('<div id="offline_list" style="padding: 0 14px 14px"></div>')
+                    e.body.append(holder)
+                }
+
+                offlineRenderList(holder)
             })
         }
 
         var offlineTimer = null
 
-        function offlineRenderList(){
+        function offlineRenderList(holder){
+            if(!holder || !holder.length) holder = $('#offline_list')
+            if(!holder.length) return
+
             if(offlineTimer){ clearInterval(offlineTimer); offlineTimer = null }
-
-            var holder = $('#offline_list')
-
-            if(!holder.length){
-                holder = $('<div id="offline_list" class="settings-param" style="padding: 12px 14px"></div>')
-                $('.settings__scroll .settings-divider:last, .settings__scroll').append(holder)
-            }
 
             holder.html('<div class="settings-param__name">' + T('offline_loading') + '</div>')
 
