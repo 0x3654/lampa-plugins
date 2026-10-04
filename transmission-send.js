@@ -62,7 +62,7 @@
             nnm_auto_bad_creds:   { ru: 'NNM RSS: неверный логин или пароль', en: 'NNM RSS: wrong login or password' },
             nnm_auto_fail:        { ru: 'NNM RSS: не получилось добавить', en: 'NNM RSS: failed to add' },
 
-            offline_title:     { ru: 'Офлайн',                          en: 'Offline' },
+            offline_title:     { ru: 'Загрузки',                      en: 'Downloads' },
             offline_hint:      { ru: 'Обновить список',                 en: 'Refresh list' },
             offline_hint_desc: { ru: 'Раздачи встроенного движка TorrServer: качаются целиком и доступны без сети', en: 'Torrents of the embedded TorrServer engine: downloaded fully and available offline' },
             offline_loading:   { ru: 'Загружаю список…',                en: 'Loading…' },
