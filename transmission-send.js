@@ -62,6 +62,19 @@
             nnm_auto_bad_creds:   { ru: 'NNM RSS: неверный логин или пароль', en: 'NNM RSS: wrong login or password' },
             nnm_auto_fail:        { ru: 'NNM RSS: не получилось добавить', en: 'NNM RSS: failed to add' },
 
+            offline_title:     { ru: 'Офлайн',                          en: 'Offline' },
+            offline_hint:      { ru: 'Обновить список',                 en: 'Refresh list' },
+            offline_hint_desc: { ru: 'Раздачи встроенного движка TorrServer: качаются целиком и доступны без сети', en: 'Torrents of the embedded TorrServer engine: downloaded fully and available offline' },
+            offline_loading:   { ru: 'Загружаю список…',                en: 'Loading…' },
+            offline_empty:     { ru: 'Пусто: открой раздачу в плеере — она появится здесь', en: 'Empty: open a torrent in the player — it will appear here' },
+            offline_ready:     { ru: 'готово',                          en: 'ready' },
+            offline_fetch:     { ru: 'Докачать',                        en: 'Fetch' },
+            offline_del:       { ru: 'Удалить',                         en: 'Delete' },
+            offline_menu:      { ru: 'Скачать (офлайн)',                en: 'Download (offline)' },
+            offline_started:   { ru: 'Скачиваю: ',                      en: 'Downloading: ' },
+            offline_queued:    { ru: 'Раздача в движке, качаю',         en: 'Torrent in the engine, fetching' },
+            offline_dead:      { ru: 'Встроенный движок недоступен',    en: 'Embedded engine unavailable' },
+
             nnm_auto_settings:        { ru: 'NNM RSS (nnm.0x3654.com)', en: 'NNM RSS (nnm.0x3654.com)' },
             nnm_auto_settings_server: { ru: 'Адрес сервера', en: 'Server address' },
             nnm_auto_settings_server_desc: {
@@ -482,6 +495,202 @@
 
             pushMenuItems(e.menu, prev, 'magnet:?xt=urn:btih:' + el.torrent_hash, { title: titleOf(el) })
         })
+
+
+        //---------- офлайн-библиотека (встроенный движок TorrServer)
+
+        // видимость: только живой встроенный движок (torrserver_url_two,
+        // в нашей оболочке это 127.0.0.1:8095) и включённые торренты —
+        // превью/сток без движка не видят ничего
+        var engineUrl = ''
+        var engineAlive = false
+
+        function engineCheck(cb){
+            var two = String(Lampa.Storage.get('torrserver_url_two') || '')
+            if(!two || two.indexOf('127.0.0.1') === -1){ engineAlive = false; cb(false); return }
+            if(two.slice(-1) === '/') two = two.slice(0, -1)
+            engineUrl = two
+
+            var xhr = new XMLHttpRequest()
+            xhr.open('GET', two + '/echo', true)
+            xhr.timeout = 1500
+            xhr.onload = function(){ engineAlive = xhr.status > 0; cb(engineAlive) }
+            xhr.onerror = xhr.ontimeout = function(){ engineAlive = false; cb(false) }
+            try{ xhr.send() }catch(e){ engineAlive = false; cb(false) }
+        }
+
+        function enginePost(json, cb){
+            if(!engineUrl){ cb(null); return }
+            var xhr = new XMLHttpRequest()
+            xhr.open('POST', engineUrl + '/torrents', true)
+            xhr.timeout = 8000
+            xhr.setRequestHeader('Content-Type', 'application/json')
+            xhr.onload = function(){
+                var data = null
+                try{ data = JSON.parse(xhr.responseText) }catch(e){}
+                cb(data)
+            }
+            xhr.onerror = xhr.ontimeout = function(){ cb(null) }
+            try{ xhr.send(JSON.stringify(json)) }catch(e){ cb(null) }
+        }
+
+        function engineList(cb){
+            enginePost({action:'list'}, function(data){
+                if(data && typeof data.length === 'number') cb(data)
+                else if(data && data.torrents) cb(data.torrents)
+                else cb([])
+            })
+        }
+
+        // «скачать целиком»: добавить магнет → приоритет всех файлов
+        function offlineDownload(magnet, title){
+            if(!engineAlive){ Lampa.Noty.show(T('offline_dead')); return }
+
+            Lampa.Noty.show(T('offline_started') + (title || ''))
+
+            enginePost({action:'add', link: magnet}, function(){
+                engineList(function(list){
+                    var hash = ''
+
+                    for(var i = 0; i < list.length; i++){
+                        if(String(list[i].name || '') === String(title || '')){ hash = list[i].hash; break }
+                    }
+
+                    if(!hash && list.length === 1) hash = list[0].hash // только что добавленная
+
+                    if(hash) enginePost({action:'priority', hash: hash, files: []}, function(){})
+                    else Lampa.Noty.show(T('offline_queued'))
+                })
+            })
+        }
+
+        function fmtSize(v){
+            v = Number(v) || 0
+            if(v > 1024 * 1024 * 1024) return (v / 1073741824).toFixed(1) + ' ГБ'
+            return Math.round(v / 1048576) + ' МБ'
+        }
+
+        // блок в настройках: список раздач движка (очередь/статус/удаление)
+        var ico_offline = '<svg viewBox="0 0 36 36" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 v14"/><path d="M11 15 l7 7 7-7"/><path d="M7 28 h22"/></svg>'
+
+        function offlineSettingsInit(){
+            Lampa.SettingsApi.addComponent({
+                component: 'offline',
+                icon: ico_offline,
+                name: T('offline_title')
+            })
+
+            Lampa.SettingsApi.addParam({
+                component: 'offline',
+                param: {
+                    name: 'offline_hint',
+                    type: 'button',
+                    default: ''
+                },
+                field: {
+                    name: T('offline_hint'),
+                    description: T('offline_hint_desc')
+                },
+                onRender: function(item){
+                    item.on('hover:enter', function(){ offlineRenderList() })
+                }
+            })
+
+            // страница настроек открылась — рисуем список
+            Lampa.Settings.listener.follow('page', function(e){
+                if(e.name !== 'offline' || !e.body) return
+                offlineRenderList()
+            })
+        }
+
+        var offlineTimer = null
+
+        function offlineRenderList(){
+            if(offlineTimer){ clearInterval(offlineTimer); offlineTimer = null }
+
+            var holder = $('#offline_list')
+
+            if(!holder.length){
+                holder = $('<div id="offline_list" class="settings-param" style="padding: 12px 14px"></div>')
+                $('.settings__scroll .settings-divider:last, .settings__scroll').append(holder)
+            }
+
+            holder.html('<div class="settings-param__name">' + T('offline_loading') + '</div>')
+
+            function draw(){
+                engineList(function(list){
+                    if(!list.length){
+                        holder.html('<div class="settings-param__name">' + T('offline_empty') + '</div>')
+                        return
+                    }
+
+                    var html = ''
+
+                    list.forEach(function(t){
+                        var size  = Number(t.size) || 0
+                        var ready = Number(t.preloaded) || 0
+                        var pct   = size > 0 ? Math.min(100, Math.round(ready * 100 / size)) : 0
+
+                        html += '<div class="settings-param selector offline__row" data-hash="' + t.hash + '" style="display:block;padding:8px 0">'
+                        html +=   '<div class="settings-param__name" style="max-width:100%;white-space:normal">' + String(t.name || '—') + '</div>'
+                        html +=   '<div style="margin:6px 0;height:4px;background:#2c2c2c;border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:#38b03c"></div></div>'
+                        html +=   '<div style="display:flex;justify-content:space-between;align-items:center">'
+                        html +=     '<span style="opacity:.55;font-size:.9em">' + pct + '% · ' + fmtSize(size) + (pct >= 100 ? ' · ' + T('offline_ready') : '') + '</span>'
+                        html +=     '<span>'
+                        html +=       '<button class="offline__dl" style="margin-right:12px">' + T('offline_fetch') + '</button>'
+                        html +=       '<button class="offline__del">' + T('offline_del') + '</button>'
+                        html +=     '</span>'
+                        html +=   '</div>'
+                        html += '</div>'
+                    })
+
+                    holder.html(html)
+
+                    holder.find('.offline__dl').on('click', function(e){
+                        e.stopPropagation()
+                        var hash = $(this).closest('.offline__row').data('hash')
+                        enginePost({action:'priority', hash: hash, files: []}, function(){ draw() })
+                    })
+
+                    holder.find('.offline__del').on('click', function(e){
+                        e.stopPropagation()
+                        var hash = $(this).closest('.offline__row').data('hash')
+                        enginePost({action:'delete', hash: hash}, function(){ draw() })
+                    })
+                })
+            }
+
+            draw()
+            offlineTimer = setInterval(draw, 3000)
+        }
+
+        engineCheck(function(alive){
+            if(!alive) return // без движка (превью/сток) блока и пунктов нет
+
+            offlineSettingsInit()
+
+            // лонг-пресс: «Скачать (офлайн)» первым пунктом
+            ;['torrent', 'torrent_file'].forEach(function(evt){
+                Lampa.Listener.follow(evt, function(e){
+                    if(e.type !== 'onlong' || !e.menu || !e.element) return
+
+                    var el = e.element
+                    var magnet = evt === 'torrent_file'
+                        ? 'magnet:?xt=urn:btih:' + (el.torrent_hash || '')
+                        : magnetOf(el)
+
+                    if(!magnet) return
+
+                    e.menu.unshift({
+                        title: T('offline_menu'),
+                        onSelect: wrap(Lampa.Controller.enabled().name, function(){
+                            offlineDownload(magnet, titleOf(el))
+                        })
+                    })
+                })
+            })
+        })
+
 
     }
 
