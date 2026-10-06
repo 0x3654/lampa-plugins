@@ -1167,8 +1167,9 @@
         //---------- «Топ» вместо главной
 
         // свежие бандлы глотают Activity.replace, сделанный сразу на
-        // загрузке плагина (навигация ещё не готова) — давим с ретраями,
-        // пока главной экран действительно не сменится
+        // загрузке плагина — навигация готова сильно позже appready
+        // (замер: replace срабатывает от ~12с после загрузки) — давим
+        // секунду за секундой, пока экран главной действительно не сменится
         function topAsHome(attempt){
             if(String(Lampa.Storage.field('top_as_home')) !== 'true') return
             if((Lampa.Activity.active() || {}).component !== 'main') return
@@ -1188,7 +1189,7 @@
             }
             catch(e){}
 
-            if(attempt < 10) setTimeout(function(){ topAsHome(attempt + 1) }, 700)
+            if(attempt < 40) setTimeout(function(){ topAsHome(attempt + 1) }, 1000)
         }
 
         if(window.appready) topAsHome(0)

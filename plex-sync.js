@@ -29,9 +29,11 @@
     var TV      = 'https://plex.tv/api/v2' // облако Plex (CORS открыт — проверено)
     var WATCHED = 90                       // %, с которого считаем просмотренным
     var PAGE    = 500                      // страница обхода библиотеки
-    var SYNC_REV = 4                       // ревизия логики импорта: подняли —
+    var SYNC_REV = 5                       // ревизия логики импорта: подняли —
                                            // все устройства один раз тихо
                                            // досинхронятся при следующем старте
+                                           // (5: история/«Просмотрено» пишутся
+                                           // и локально при аккаунт-синке)
 
     function init(){
         var Lampa = window.Lampa
@@ -986,9 +988,13 @@
 
         //---------- события
 
-        // лампа сама режет «Историю» до 100 (лимит захардкожен в старте
-        // плеера) — перехватываем add и для history поднимаем до 5000,
-        // пятилетка из Plex влезает; чужие лимиты не трогаем
+        // две беды нового бандла одним перехватом:
+        // 1) лампа режет «Историю» до 100 — для history поднимаем до 5000;
+        // 2) при включённом аккаунт-синке Favorite.add пишет ТОЛЬКО в
+        //    облако (событие), локальные списки остаются пустыми — топы не
+        //    видят отметок, «лучшие» показывает непросмотренным. Пишем и
+        //    локально: на миг выключаем Permit.sync, оригинал кладёт
+        //    данные, возвращаем флаг — облако досинхронит само
         ;(function uncropHistory(){
             try{
                 var orig = Lampa.Favorite.add
@@ -998,7 +1004,19 @@
                 var wrap = function(where, card, limit){
                     if(where === 'history') limit = 5000
 
-                    return orig.call(Lampa.Favorite, where, card, limit)
+                    var permit = null
+
+                    try{ permit = window.Lampa.Account && window.Lampa.Account.Permit }catch(e){}
+                    var was = permit && permit.sync
+
+                    if(was) permit.sync = false
+
+                    try{
+                        return orig.call(Lampa.Favorite, where, card, limit)
+                    }
+                    finally{
+                        if(was) permit.sync = true
+                    }
                 }
 
                 wrap.__plexUncrop = true

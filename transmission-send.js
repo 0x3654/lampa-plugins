@@ -202,6 +202,23 @@
             if(v) val.text(new Array(Math.min(v.length, 16) + 1).join('•'))
         }
 
+        // onRender свежие бандлы глотают — дожимаем маску при открытии
+        // секции и пару секунд после (перерисовки настроек)
+        try{
+            Lampa.Settings.listener.follow('open', function(e){
+                if(e.name !== 'nnm_auto') return
+
+                for(var i = 1; i <= 5; i++){
+                    ;(function(delay){
+                        setTimeout(function(){
+                            try{ maskPass() }catch(e){}
+                        }, delay * 400)
+                    })(i)
+                }
+            })
+        }
+        catch(e){}
+
         Lampa.SettingsApi.addParam({
             component: 'nnm_auto',
             param: {
