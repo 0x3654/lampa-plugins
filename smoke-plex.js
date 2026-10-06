@@ -111,7 +111,7 @@ sandbox.Lampa = {
         }
     },
     Favorite: { add(type, card, limit){ calls.favoriteAdds.push({ type, card, limit }) } },
-    Account: { Permit: { sync: false } },
+    Account: { Permit: { sync: true } },
     Api: { sources: { tmdb: { get(method, params, ok, fail){ ok(state.tmdb[method]) } } } }
 }
 
@@ -455,7 +455,7 @@ console.log('✓ обёртка истории: нативный add(…,100) �
             Utils: { hash: lampaHash },
             Timeline: { update(p){ c.timelineUpdates.push(p) }, view(h){ return { hash: h, percent: 0, updated: 0 } } },
             Favorite: { add(t, card, limit){ c.favoriteAdds.push({ type: t, card, limit }) } },
-            Account: { Permit: { sync: false } },
+            Account: { Permit: { sync: true } },
             Api: { sources: { tmdb: { get(m, p, ok){ ok(undefined) } } } },
         }
         vm.createContext(sb)
