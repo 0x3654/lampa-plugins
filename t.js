@@ -46,30 +46,6 @@
     if(window[FLAG]) return
     window[FLAG] = true
 
-    // полный сброс по маркеру ?wipe: у PWA (Add to Dock) нет ни DevTools,
-    // ни «очистить кэш» — их хранилище лежит в общем контейнере WebKit
-    // без разбора по приложениям. Открытие /?wipe стирает localStorage
-    // и IndexedDB (там кэш лампы) и перезагружается чистой страницей
-    if(/(^|[?&])wipe/.test(window.location.search)){
-        try{
-            localStorage.clear()
-            sessionStorage.clear()
-
-            var clean = function(){ window.location.href = window.location.pathname }
-
-            if(window.indexedDB && indexedDB.databases){
-                indexedDB.databases().then(function(dbs){
-                    dbs.forEach(function(d){ try{ indexedDB.deleteDatabase(d.name) }catch(e){} })
-                    clean()
-                }).catch(clean)
-            }
-            else clean()
-        }
-        catch(e){ window.location.href = window.location.pathname }
-
-        return
-    }
-
     // поднять после правки CONFIG — настройки применятся заново
     // v15: санитайзер мёртвых адресов + вотчдог против облачного
     // синка localStorage нативного приложения
