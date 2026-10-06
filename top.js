@@ -1166,7 +1166,13 @@
 
         //---------- «Топ» вместо главной
 
-        if(String(Lampa.Storage.field('top_as_home')) === 'true'){
+        // свежие бандлы глотают Activity.replace, сделанный сразу на
+        // загрузке плагина (навигация ещё не готова) — давим с ретраями,
+        // пока главной экран действительно не сменится
+        function topAsHome(attempt){
+            if(String(Lampa.Storage.field('top_as_home')) !== 'true') return
+            if((Lampa.Activity.active() || {}).component !== 'main') return
+
             var homeVariant = VARIANTS[lastVariantIndex()]
 
             try{
@@ -1181,7 +1187,14 @@
                 })
             }
             catch(e){}
+
+            if(attempt < 10) setTimeout(function(){ topAsHome(attempt + 1) }, 700)
         }
+
+        if(window.appready) topAsHome(0)
+        else Lampa.Listener.follow('app', function(e){
+            if(e.type === 'ready') topAsHome(0)
+        })
 
         //---------- настройки
 

@@ -512,7 +512,7 @@ console.log('✓ «скрыть просмотренные»: 4 источник
 // --- 8. «Топ» вместо главной (отдельный контекст с включённым тумблером)
 {
     const calls2 = { replace: [] }
-    const sb = { console, navigator: {}, document: { createElement: () => ({}) }, window: null }
+    const sb = { console, navigator: {}, document: { createElement: () => ({}) }, setTimeout(){}, window: null }
     sb.window = sb
     sb.appready = true
     sb.Lampa = {
@@ -527,7 +527,7 @@ console.log('✓ «скрыть просмотренные»: 4 источник
             get(key, def){ return key === 'top_last_variant' ? '3' : def }, // tv_week в новой таблице
             set(){}
         },
-        Activity: { push(){}, replace(a){ calls2.replace.push(a) } }
+        Activity: { push(){}, replace(a){ calls2.replace.push(a) }, active(){ return { component: 'main' } } }
     }
     vm.createContext(sb)
     vm.runInContext(source, sb)
