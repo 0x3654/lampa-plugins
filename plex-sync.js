@@ -841,6 +841,24 @@
                                 // «Синхронизировать» (диагностика с конуса)
                                 try{ Lampa.Storage.set('plex_imp', { ts: Date.now(), stat: stat }) }catch(e){}
 
+                                // галки/скрытие «просмотренного» топы берут
+                                // при рендере — экран, открытый ДО импорта,
+                                // останется без отметок; пересобираем текущий
+                                // экран, если это топ
+                                try{
+                                    var cur = Lampa.Activity.active() || {}
+
+                                    if(cur.component === 'top_screen' || cur.component === 'top_trackers'){
+                                        Lampa.Activity.push({
+                                            url: cur.url || '',
+                                            title: cur.title,
+                                            component: cur.component,
+                                            page: 1
+                                        })
+                                    }
+                                }
+                                catch(e){}
+
                                 done(null, stat)
                             })
                         })
