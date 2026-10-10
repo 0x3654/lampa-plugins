@@ -1137,11 +1137,41 @@
                 xhr.onload = function(){
                     if(xhr.status !== 200) return
 
-                    try{ marksApply(JSON.parse(xhr.responseText)) }catch(e){}
+                    var marks = []
+
+                    try{ marks = JSON.parse(xhr.responseText) }catch(e){ return }
+
+                    marksApply(marks)
+                    marksSyncUp(marks)
                 }
                 xhr.send()
             }
             catch(e){}
+        }
+
+        // начальный/регулярный sync-up: локальные отметки (включая то, что
+        // лампа видит через аккаунт-синк из CUB) доталкиваются в базу,
+        // если их там ещё нет — база наполняется сама с первого старта
+        // любого устройства, отдельного засева не нужно
+        function marksSyncUp(baseMarks){
+            var inBase = {}
+
+            ;(baseMarks || []).forEach(function(m){
+                if(m && m.list) inBase[m.list + '|' + m.card_id] = true
+            })
+
+            MARKS_LISTS.forEach(function(list){
+                var cards = []
+
+                try{ cards = Lampa.Favorite.get({ type: list }) || [] }catch(e){}
+
+                cards.forEach(function(card){
+                    if(!card || card.id == null) return
+
+                    if(!inBase[list + '|' + marksCardId(card)])
+                        marksPush(list, card, false)
+                })
+            })
         }
 
         // вливание базы: недостающие отметки добавить, снятые (tombstone) —
