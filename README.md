@@ -134,14 +134,39 @@ defaults to the ru2 tunnel over https (`https://ru2.0x3654.com/plex`;
 plain http would be blocked as mixed content from an https page) — clear
 the field to let the account's own server list pick the address.
 
+## marks
+
+The single stable store for every watch mark — manual card statuses
+(watching / viewed / planned / continuing / dropped), history, bookmarks.
+The local cache is expendable and the CUB cloud proved unreliable (it does
+not store «Viewed» at all, caps history at 500 and its reconcile wipes
+local lists), so the marks live in **our own tiny service** and every
+device just mirrors it.
+
+| Piece | What it does |
+|---|---|
+| `marks/` (Go, stdlib only) | JSON-file store with atomic rename; `GET` dump / `POST` LWW-merge + tombstones; secret URL path; 3/3 tests; CI → `ghcr.io/0x3654/marks` |
+| plex-sync client | pull on boot + a 5-minute watchdog (restores whatever a reconcile ate), push of every mark (manual toggles, imports, the player) in a debounced batch, and a boot sync-up that backfills the base from local lists |
+| t.js | sets `marks_url` — the base endpoint; empty keeps the feature dormant |
+
+A fresh device or a wiped cache recovers everything on first start. The
+public instance serves `https://marks.0x3654.com`.
+
 ## t.js bootstrap
 
-One short URL for a fresh Lampa install: adds the plugins above (plus the etor
-torrent unlock and tmdb-proxy), applies a curated settings block once
-(version-gated), picks the TorrServer link by probing, migrates old plugin
-URLs after the repository rename and self-heals the Apple TV platform
-detection glitch. Source of truth lives in the user-site repo; the copy here
-mirrors it.
+One short URL for a fresh Lampa install: adds the plugins above (plus the
+tmdb-proxy), applies a curated settings block once (version-gated), picks
+the TorrServer link by probing (embedded on Apple TV, the Mac's own
+TorrServer on desktops, the public ru2 server elsewhere), unlocks the
+torrent features natively (no etor cub plugin), migrates old plugin URLs
+after the repository rename and self-heals the Apple TV platform detection
+glitch. Source of truth lives in the user-site repo; the copy here mirrors
+it.
+
+On the clone itself the settings UI carries no foreign sync: the
+«Синхронизация» (CUB account) section and the head profile button are
+removed, and the card statuses are unlocked from the CUB premium gate —
+every status flows into the marks base instead.
 
 ## tracker-top
 
@@ -161,6 +186,26 @@ In-memory cache (TTL 600 s), CORS `*`, mirror override via `NNM_BASE` /
 `RUTOR_BASE`. CI builds a multi-arch image: `ghcr.io/0x3654/tracker-top`
 (deps → test → build → scratch; a broken parser fails the build; non-root,
 healthcheck). A public instance serves `https://top.0x3654.com`.
+
+## Roadmap
+
+- **seasonvar.ru sync** — import the account's episode marks the plex-sync
+  way; the API is undocumented (digging through grabbers/Kodi plugins),
+  likely needs a proxy like `/plex/`
+- **Rating tops** — an NNM variant sorted by rating (`o=5`) next to the
+  seeds/date tops
+- **Torrent release-kind filters** — a filter slice in Lampa's own
+  torrent menu (one level above our Torrent Send): camrip / TS / WEBRIP
+  and similar release kinds, next to the existing quality/voice filters
+- **Quick reset-to-defaults** — a fast way to restore the default filter
+  state in that menu
+- **NNM proxy rotor** — rotating the three user VPSes against IP bans
+- Live check of the outgoing Plex scrobble (watch ≥ 90 % in Lampa → the
+  mark lands on the Plex server)
+
+Done highlights: the marks single store, the Apple TV embedded TorrServer
+over http, the cub cuts on the clone (ads/analytics/censorship/Shots),
+unlocked card statuses, the Plex↔Lampa sync.
 
 ## Development
 
@@ -432,6 +477,26 @@ GET /healthz
 CI собирает multi-arch образ `ghcr.io/0x3654/tracker-top` (deps → test →
 build → scratch; сломанный парсер валит сборку; non-root, healthcheck).
 Публичный инстанс: `https://top.0x3654.com`.
+
+## Планы
+
+- **Синк с seasonvar.ru** — импорт отметок серий аккаунта по образцу
+  plex-sync; API недокументирован (копать грабберы/kodi-плагины),
+  вероятно понадобится прокси как `/plex/`
+- **Топы по рейтингу** — вариант NNM с сортировкой по рейтингу (`o=5`)
+  рядом с топами по сидам/дате
+- **Фильтры типов релизов** — разрез фильтров в родном меню торрентов
+  лампы (на уровень выше нашего Torrent Send): camrip / TS / WEBRIP и
+  подобные типы релизов, рядом с существующими фильтрами качества/озвучки
+- **Быстрый сброс фильтров** — одной кнопкой возвращать состояние
+  фильтров по умолчанию
+- **Прокси-ротор NNM** — ротация трёх VPS на случай IP-банов
+- Живая проверка исходящего scrobble в Plex (досмотреть ≥ 90 % в лампе →
+  отметка на сервере Plex)
+
+Сделано из крупного: база отметок marks, встроенный TorrServer на Apple TV
+по http, срезы cub на клоне (реклама/аналитика/цензура/Shots), свободные
+статусы карточки, синк Plex↔Lampa.
 
 ## Разработка
 
