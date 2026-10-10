@@ -398,6 +398,20 @@
         }
         catch(e){}
 
+        // кнопка профиля CUB в шапке (открывает их аккаунт-меню) —
+        // убираем: профиль/синк больше не часть нашей страницы
+        try{
+            var killProfileBtn = function(){
+                $('.head .open--profile').remove()
+            }
+
+            killProfileBtn()
+            Lampa.Listener.follow('app', function(e){
+                if(e.type === 'ready') setTimeout(killProfileBtn, 500)
+            })
+        }
+        catch(e){}
+
         // настройки — при первом запуске (или после повышения VERSION);
         // ПРИМЕНЕНИЕ МОЛЧАЛИВОЕ: перезагрузки по «маркер пропал» были
         // источником кругов — облачный синк приложения удаляет маркер
