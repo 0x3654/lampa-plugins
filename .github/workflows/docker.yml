@@ -3,12 +3,11 @@ name: docker
 on:
   push:
     branches: [main]
-    paths: ['tracker-top/**', '.github/workflows/docker.yml']
+    paths: ['tracker-top/**', 'marks/**', '.github/workflows/docker.yml']
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ghcr.io/${{ github.repository_owner }}/tracker-top
 
 jobs:
   build:
@@ -16,6 +15,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - context: tracker-top
+            image: tracker-top
+          - context: marks
+            image: marks
     steps:
       - uses: actions/checkout@v4
 
@@ -31,12 +37,12 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: tracker-top
+          context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
           build-args: |
             GIT_REV=${{ github.sha }}
           push: true
           tags: |
-            ${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
