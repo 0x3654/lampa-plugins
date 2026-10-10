@@ -1071,7 +1071,9 @@
         // pull при старте + вотчдогом (восстанавливает съеденное), push на
         // каждую отметку — ручную, из Plex-импорта, от плеера. Адрес —
         // storage marks_url (ставит t.js); пусто → база выключена
-        var MARKS_LISTS = ['viewed', 'history', 'look', 'thrown', 'book', 'like', 'wath']
+        // все списки отметок лампы, включая статусы карточки
+        // («Смотрю/Просмотрено/Запланировано/Продолжение/Брошено»)
+        var MARKS_LISTS = ['viewed', 'history', 'look', 'scheduled', 'continued', 'thrown', 'book', 'like', 'wath']
         var marksQueue  = {}
         var marksTimer  = null
 
