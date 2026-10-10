@@ -6,10 +6,10 @@ const assert = require('assert')
 
 const source = fs.readFileSync(__dirname + '/plex-sync.js', 'utf8')
 
-const calls = { xhr: [], noty: [], params: [], timelineUpdates: [], favoriteAdds: [], modal: [], plugins: [] }
+const calls = { xhr: [], noty: [], params: [], timelineUpdates: [], favoriteAdds: [], favoriteRemoves: [], modal: [], plugins: [] }
 const listeners = {}
 const state = {
-    storage: {}, fields: {},
+    storage: {}, fields: {}, favLists: {},
     xhrRoutes: [],   // [{match(url, method), reply: {status, json}}]
     tmdb: {},        // 'movie/100' → карточка
     intervals: {},   // фейковые интервалы: id → fn
@@ -33,8 +33,8 @@ class FakeXHR {
     constructor(){ this.headers = {} }
     open(method, url){ this.method = method; this.url = url }
     setRequestHeader(k, v){ this.headers[k.toLowerCase()] = v }
-    send(){
-        calls.xhr.push({ method: this.method, url: this.url, headers: this.headers })
+    send(body){
+        calls.xhr.push({ method: this.method, url: this.url, headers: this.headers, body })
 
         for(const r of state.xhrRoutes){
             if(r.match(this.url, this.method)){
@@ -53,7 +53,7 @@ class FakeXHR {
 }
 
 const sandbox = {
-    console, Math, Date, JSON, parseInt, setTimeout,
+    console, Math, Date, JSON, parseInt, setTimeout, clearTimeout,
     navigator: {},
     document: { createElement: () => ({}) },
     XMLHttpRequest: FakeXHR,
@@ -110,8 +110,21 @@ sandbox.Lampa = {
             return (state.storage.__tl && state.storage.__tl[hash]) || { hash, percent: 0, time: 0, duration: 0, profile: 0, updated: 0 }
         }
     },
-    Favorite: { add(type, card, limit){ calls.favoriteAdds.push({ type, card, limit }) } },
-    Account: { Permit: { sync: true } },
+    Favorite: {
+        add(type, card, limit){
+            calls.favoriteAdds.push({ type, card, limit })
+            state.favLists[type] = state.favLists[type] || []
+            if(!state.favLists[type].some(c => c.id === card.id)) state.favLists[type].push(card)
+        },
+        remove(type, card){
+            calls.favoriteRemoves.push({ type, card })
+            state.favLists[type] = (state.favLists[type] || []).filter(c => c.id !== card.id)
+        },
+        toggle(type, card){
+            ((state.favLists[type] || []).some(c => c.id === card.id)) ? this.remove(type, card) : this.add(type, card)
+        },
+        get(q){ return state.favLists[q.type] || [] }
+    },
     Api: { sources: { tmdb: { get(method, params, ok, fail){ ok(state.tmdb[method]) } } } }
 }
 
@@ -496,4 +509,35 @@ console.log('✓ обёртка истории: нативный add(…,100) �
     console.log('✓ досинхронизация в покое: сбой не съедает ретрай, успех — один импорт и тишина')
 }
 
-console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')
+// --- 12. marks «одна база»: отметка → POST в базу, снятие → tombstone
+// (асинхронно: push дебаунсится 3с)
+const marksTest = (async () => {
+    await new Promise(r => setTimeout(r, 100))
+    assert.ok(calls.xhr.filter(x => (x.url || '').includes('marks')).length === 0,
+        'без marks_url база молчит')
+
+    state.fields.marks_url = 'https://marks.0x3654.com/m/secret/'
+
+    // ручная отметка через toggle (путь контекстного меню)
+    sandbox.Lampa.Favorite.toggle('viewed', { id: 969681, title: 'Паук', release_date: '2026-01-01' })
+    await new Promise(r => setTimeout(r, 3600))
+
+    const posts = calls.xhr.filter(x => (x.url || '').includes('marks') && x.method === 'POST')
+    assert.ok(posts.length === 1, `отметка ушла в базу одним POST (${posts.length})`)
+    const sent = JSON.parse(posts[0].body)
+    assert.ok(sent[0].card_id === 'movie:969681' && sent[0].list === 'viewed' && !sent[0].deleted,
+        'card_id/список верные, не tombstone')
+
+    // снятие — tombstone
+    sandbox.Lampa.Favorite.toggle('viewed', { id: 969681 })
+    await new Promise(r => setTimeout(r, 3600))
+    const posts2 = calls.xhr.filter(x => (x.url || '').includes('marks') && x.method === 'POST')
+    const sent2 = JSON.parse(posts2[posts2.length - 1].body)
+    assert.ok(sent2[0].deleted === true && sent2[0].card_id === 'movie:969681', 'снятие отметки — tombstone')
+
+    console.log('✓ marks: ручная отметка → POST movie:<id>, снятие → tombstone (дебаунс одной пачкой)')
+})()
+
+marksTest.then(() => {
+    console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')
+}).catch(e => { console.error('MARKS FAIL', e.message); process.exit(1) })

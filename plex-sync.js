@@ -845,19 +845,7 @@
                                 // при рендере — экран, открытый ДО импорта,
                                 // останется без отметок; пересобираем текущий
                                 // экран, если это топ
-                                try{
-                                    var cur = Lampa.Activity.active() || {}
-
-                                    if(cur.component === 'top_screen' || cur.component === 'top_trackers'){
-                                        Lampa.Activity.push({
-                                            url: cur.url || '',
-                                            title: cur.title,
-                                            component: cur.component,
-                                            page: 1
-                                        })
-                                    }
-                                }
-                                catch(e){}
+                                refreshTopScreens()
 
                                 done(null, stat)
                             })
@@ -1006,6 +994,24 @@
 
         //---------- события
 
+        // топы читают отметки при рендере — после импорта/восстановления
+        // отметок открытый экран надо пересобрать
+        function refreshTopScreens(){
+            try{
+                var cur = Lampa.Activity.active() || {}
+
+                if(cur.component === 'top_screen' || cur.component === 'top_trackers'){
+                    Lampa.Activity.push({
+                        url: cur.url || '',
+                        title: cur.title,
+                        component: cur.component,
+                        page: 1
+                    })
+                }
+            }
+            catch(e){}
+        }
+
         // три беды нового бандла одним перехватом:
         // 1) лампа режет «Историю» до 100 — для history поднимаем до 5000;
         // 2) при включённом аккаунт-синке Favorite.add пишет ТОЛЬКО событие
@@ -1039,12 +1045,18 @@
                         permit.sync = false
                     }
 
+                    var res
+
                     try{
-                        return orig.call(Lampa.Favorite, where, card, limit)
+                        res = orig.call(Lampa.Favorite, where, card, limit)
                     }
                     finally{
                         if(was) permit.sync = true
                     }
+
+                    marksPush(where, card, false)
+
+                    return res
                 }
 
                 wrap.__plexUncrop = true
@@ -1052,6 +1064,181 @@
             }
             catch(e){}
         })()
+
+        //---------- marks: «одна база» отметок (свой сервер, стабильный)
+        // локальный кеш расходник, облако CUB ненадёжно (viewed не синкает
+        // вовсе, history капит 500, сверка затирает локальное). Наша база:
+        // pull при старте + вотчдогом (восстанавливает съеденное), push на
+        // каждую отметку — ручную, из Plex-импорта, от плеера. Адрес —
+        // storage marks_url (ставит t.js); пусто → база выключена
+        var MARKS_LISTS = ['viewed', 'history', 'look', 'thrown', 'book', 'like', 'wath']
+        var marksQueue  = {}
+        var marksTimer  = null
+
+        function marksUrl(){
+            try{
+                // лампа хранит простые строки сырыми (JSON-парсит только [
+                // и {) — на всякий случай срезаем возможные кавычки
+                return String(Lampa.Storage.field('marks_url') || '').trim().replace(/^\"+|\"+$/g, '')
+            }catch(e){ return '' }
+        }
+
+        function marksCardId(card){
+            return (card && card.name ? 'tv:' : 'movie:') + (card ? card.id : '')
+        }
+
+        function marksPush(list, card, deleted){
+            if(!card || card.id == null) return
+            if(MARKS_LISTS.indexOf(list) === -1) return
+            if(!marksUrl()) return
+
+            marksQueue[list + '|' + marksCardId(card)] = {
+                list:     list,
+                card_id:  marksCardId(card),
+                card:     card,
+                updated:  Date.now(),
+                deleted:  deleted ? true : undefined
+            }
+
+            clearTimeout(marksTimer)
+            marksTimer = setTimeout(marksFlush, 3000)
+        }
+
+        function marksFlush(){
+            var batch = []
+
+            for(var k in marksQueue) batch.push(marksQueue[k])
+            marksQueue = {}
+
+            var url = marksUrl()
+            if(!batch.length || !url) return
+
+            try{
+                var xhr = new XMLHttpRequest()
+
+                // text/plain — simple request, без CORS-префлайта; тело — JSON
+                xhr.open('POST', url, true)
+                xhr.timeout = 15000
+                xhr.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8')
+                xhr.send(JSON.stringify(batch))
+            }
+            catch(e){}
+        }
+
+        function marksPull(){
+            var url = marksUrl()
+            if(!url) return
+
+            try{
+                var xhr = new XMLHttpRequest()
+
+                xhr.open('GET', url, true)
+                xhr.timeout = 20000
+                xhr.onload = function(){
+                    if(xhr.status !== 200) return
+
+                    try{ marksApply(JSON.parse(xhr.responseText)) }catch(e){}
+                }
+                xhr.send()
+            }
+            catch(e){}
+        }
+
+        // вливание базы: недостающие отметки добавить, снятые (tombstone) —
+        // убрать; локальные НЕ трогаем (база только восполняет/снимает)
+        function marksApply(marks){
+            var have = {}
+
+            MARKS_LISTS.forEach(function(t){
+                have[t] = {}
+
+                try{
+                    (Lampa.Favorite.get({ type: t }) || []).forEach(function(c){ have[t][c.id] = true })
+                }catch(e){}
+            })
+
+            var changed = 0
+
+            ;(marks || []).forEach(function(m){
+                if(!m || MARKS_LISTS.indexOf(m.list) === -1) return
+
+                var id   = parseInt(String(m.card_id || '').split(':')[1], 10)
+                var card = m.card && typeof m.card === 'object' ? m.card : { id: id }
+
+                if(!id || isNaN(id)) return
+
+                // сериалы отличаем по name — ключ базы «tv:»/«movie:»
+                if(String(m.card_id).indexOf('tv:') === 0 && !card.name && card.title){
+                    card.name = card.title
+                    delete card.title
+                }
+
+                if(m.deleted){
+                    if(have[m.list][id]){
+                        try{ Lampa.Favorite.remove(m.list, { id: id }) ; changed++ }catch(e){}
+                    }
+                }
+                else if(!have[m.list][id]){
+                    try{ Lampa.Favorite.add(m.list, card) ; changed++ }catch(e){}
+                }
+            })
+
+            if(changed) refreshTopScreens()
+        }
+
+        // ручные отметки (контекстное меню карточки) идут через toggle и
+        // remove — внутренними путями мимо add; ловим и их
+        ;(function marksWrapToggle(){
+            try{
+                var orig = Lampa.Favorite.toggle
+
+                if(orig.__marksWrap) return
+
+                function inList(list, id){
+                    try{ return (Lampa.Favorite.get({ type: list }) || []).some(function(c){ return c.id === id }) }
+                    catch(e){ return false }
+                }
+
+                var wrap = function(where, card){
+                    var before = card ? inList(where, card.id) : false
+                    var res    = orig.apply(Lampa.Favorite, arguments)
+                    var after  = card ? inList(where, card.id) : false
+
+                    if(after !== before) marksPush(where, card, !after)
+
+                    return res
+                }
+
+                wrap.__marksWrap = true
+                Lampa.Favorite.toggle = wrap
+            }
+            catch(e){}
+        })()
+
+        ;(function marksWrapRemove(){
+            try{
+                var orig = Lampa.Favorite.remove
+
+                if(orig.__marksRemove) return
+
+                var wrap = function(where, card){
+                    marksPush(where, card, true)
+
+                    return orig.apply(Lampa.Favorite, arguments)
+                }
+
+                wrap.__marksRemove = true
+                Lampa.Favorite.remove = wrap
+            }
+            catch(e){}
+        })()
+
+        // стартовый pull + вотчдог: облако CUB может затереть локальные
+        // списки своей сверкой — база восполняет их каждые 5 минут
+        setTimeout(marksPull, 12000)
+        setInterval(function(){
+            if(!importing) marksPull()
+        }, 5 * 60 * 1000)
 
         Lampa.Player.listener.follow('start', onPlayerStart)
 
