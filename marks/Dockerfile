@@ -9,7 +9,8 @@ RUN go test ./... && \
 
 FROM alpine:3.21
 RUN apk add --no-cache tini ca-certificates && \
-    adduser -D -u 1000 marks
+    adduser -D -u 1000 marks && \
+    mkdir -p /data && chown marks:marks /data
 COPY --from=build /marks /usr/local/bin/marks
 USER 1000
 VOLUME /data
