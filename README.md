@@ -1,5 +1,3 @@
-<div align="center">
-
 # 🔌 Lampa Plugins
 
 **Plugins for the [Lampa](https://lampa.mx) media app and the tracker-top backend**
@@ -9,7 +7,331 @@
 [![Docker](https://img.shields.io/badge/tracker--top-ghcr.io%2F0x3654-2496ED.svg)](https://github.com/0x3654/lampa-plugins/pkgs/container/tracker-top)
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)](https://go.dev)
 
-[Install](#install) · [Top](#top) · [Torrent Send](#torrent-send) · [t.js](#tjs-bootstrap) · [tracker-top](#tracker-top) · [Development](#development) · [По-русски](#по-русски)
+[Установка](#установка) · [Top](#top--адекватный-топ-вместо-ленты) · [Torrent Send](#torrent-send--отправка-в-торрент-клиент) · [Plex Sync](#plex-sync--статус-просмотра) · [marks](#marks-база-отметок) · [t.js](#tjs-бутстрап) · [tracker-top](#tracker-top--сервер-топов) · [Разработка](#разработка) · [English](#english)
+
+
+
+## Установка
+
+В Lampa: Настройки → Расширения → «+», вставить URL (на каждом устройстве
+отдельно; PWA на iPhone — отдельно от вкладки Safari):
+
+| Плагин | URL |
+|---|---|
+| Top | `https://0x3654.github.io/lampa-plugins/top.js` |
+| Torrent Send | `https://0x3654.github.io/lampa-plugins/transmission-send.js` |
+| Plex Sync | `https://0x3654.github.io/lampa-plugins/plex-sync.js` |
+| всё сразу | `https://0x3654.github.io/t.js` (бутстрап, см. ниже) |
+
+## Top — «адекватный топ» вместо ленты
+
+Два пункта в главном меню — основной плагин.
+
+### Топ · TMDB
+
+Популярное/лучшее по TMDB — по три смысла на фильмы и сериалы: тренды недели
+(горячее сейчас), лучшее по рейтингу (классика), новинки 2025+ (широкий
+каталог свежего). Шесть вариантов; «за день» и окна 14/30 дней убраны — они
+совпадали с трендами недели на 78–100%, а окна премьер вмещали 8–15 фильмов.
+Переключение варианта — кнопка **вправо** на экране. Карточки
+и пагинация нативные, запросы идут через API Lampa (учитывается прокси TMDB
+из настроек), экраны открываются мгновенно.
+
+### Топ · трекеры
+
+Топ раздач NNMClub/RUTOR, только видео-категории, обогащённый постерами и
+метаданными TMDB. Клик по карточке — обычная страница фильма в Lampa:
+качество и озвучку выбираешь дальше в парсере, поэтому раздачи одного фильма
+схлопываются в одну позицию. Сортировка (кнопка вправо): по сидам «сейчас»
+или «классика» — завершённость за всё время (NNM `o=6`, rutor в этом режиме
+не участвует). Раздачи, не сматчившиеся с TMDB (софт, игры, сборники), не
+показываются.
+
+Лист фильтров (кнопка вправо) повторяет штатный фильтр торрентов: качество,
+до двух озвучек, тумблеры, «Показать».
+
+### Настройки
+
+Настройки → Топ:
+
+| Параметр | Что делает |
+|---|---|
+| Адрес сервера топа | URL tracker-top (рабочий — `https://top.0x3654.com`) |
+| «Топ» вместо главной | при запуске открывается последний вариант «Топа» вместо ленты |
+| Мин. качество (трекеры) | Любое / 720p+ / 1080p+ / 2160p+ |
+| Озвучка 1 / Озвучка 2 (трекеры) | какие плашки озвучки показывать (напр. Дубляж + Многоголосый) |
+| Скрывать просмотренные | исключать просмотренное по истории Lampa, на сервере |
+| Только с раздачами | в «Топе · TMDB» показывать только фильмы, у которых на трекерах есть раздача под наши фильтры |
+| Скрыть сериалы | «Топ · трекеры»: только фильмы |
+| Только на русском | скрывать раздачи/карточки совсем без русских букв в названии |
+| Скрыть аниме | «Топ · трекеры»: японские аниме прочь, мультики остаются (вкл по умолчанию) |
+| Скрывать CAM/TS | камрипы и «звук с TS» вычищаются ДО дедупа: фильм только с такими раздачами исчезает целиком, с нормальной — остаётся с ней (вкл по умолчанию) |
+
+## Torrent Send — отправка в торрент-клиент
+
+Два способа отправить раздачу из меню долгого нажатия (работает с любым
+трекером — магнет парсера уходит как есть):
+
+| Пункт | Когда показывается | Что делает |
+|---|---|---|
+| **Скопировать магнет** | есть магнет | магнет в буфер обмена |
+| **Открыть магнет** | есть магнет | `window.location = magnet:` → системный обработчик схемы |
+| **Добавить в Plex** (всегда последним) | есть магнет | раздача → личная лента «авто» [nnm-rss](https://github.com/0x3654/nnm-rss) → transmission-rss качает в библиотеку Plex; повторное добавление — «Уже в ленте» |
+
+Бывший плагин nnm-auto.js влит в Torrent Send; файл остаётся заглушкой — на
+устройствах, где он был установлен, удалите расширение.
+
+> [!NOTE]
+> Transmission 4.1.3 убрал CORS-заголовки из RPC, поэтому браузер/PWA не могут
+> обращаться к нему напрямую — Torrent Send идёт через системные обработчики
+> `magnet:` и нативные клиенты, а не через `fetch`.
+
+Системного UI для схем на macOS нет; обработчик переключается записью в
+LaunchServices (TRG для примера, bundle id `com.transgui`):
+
+```bash
+defaults write com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers \
+  -array-add '<dict><key>LSHandlerURLScheme</key><string>magnet</string>\
+<key>LSHandlerRoleAll</key><string>com.transgui</string></dict>'
+killall lsd
+```
+
+Проверить: `open 'magnet:?xt=urn:btih:0000000000000000000000000000000000000000'`.
+Bundle id любого приложения: `osascript -e 'id of app "Имя"'`.
+
+### «Добавить в Plex» — доступы
+
+Настройки → NNM RSS (nnm.0x3654.com):
+
+| Параметр | Что делает |
+|---|---|
+| Адрес сервера | URL сервиса nnm-rss (предзаполнен `https://nnm.0x3654.com`) |
+| Логин / Пароль | аккаунт на сервисе (регистрация на его главной); пароль лежит в localStorage устройства и в настройках скрыт точками |
+| Проверить вход | кнопка: логинится текущим логином/паролем, статус прямо в строке (✓ зелёным / ✗ красным) |
+
+Авторизация: JSON-логин → токен (кэшируется на пару сервер+логин), далее
+`Authorization: Bearer`; при 401 (смена пароля ротирует токен) — перелогин и
+один повтор.
+
+## Plex Sync — статус просмотра
+
+Двусторонний статус просмотра с аккаунтом Plex (Настройки → Plex).
+Привязка — кодом plex.tv/link (или ручным X-Plex-Token); сервер аккаунта
+определяется сам, ручной LAN-адрес — опционально. До привязки аккаунта
+ничего не отправляется.
+
+| Направление | Что происходит |
+|---|---|
+| Lampa → Plex | досмотрели (≥ 90%) — scrobble на сервере; частичный просмотр — позиция; сняли отметку — unscrobble |
+| Plex → Lampa | «Синхронизировать» переносит просмотренное и позиции в таймлайн Lampa (прогресс на карточках), «Историю просмотров» и отметки «Просмотрено» (скрытие лент читает отметки и не зависит от истории; заодно плагин поднимает сам лимит истории лампы со 100 до 5000) |
+
+Матчинг точный, по TMDB-гуидам (`tmdb://id` — их несут агенты Plex
+Movie/Series). Локальная отметка новее входящей не затирается (LWW). С
+включённым «Sync Watch State» у аккаунта отметка на одном сервере сама
+разъедется по остальным. Адрес сервера по умолчанию — тоннель на ru2 по
+https (`https://ru2.0x3654.com/plex`; чистый http с https-страницы браузер
+режет как mixed content); очистите поле — плагин возьмёт адрес
+из списка серверов аккаунта.
+
+Импорт пишет отметки и локально (обходя «облачную» ветку бандла, где при
+аккаунт-синке списки не растут вовсе), и событием в облако — иначе сверка
+затирает их своей копией. При включённом аккаунт-синке CUB отметки из Plex
+долгое время жили только в таймлайне — теперь и «История», и «Просмотрено»
+на месте, а открытый экран топов пересобирается по завершению импорта.
+
+## marks — база отметок
+
+Одно стабильное хранилище всех отметок: ручные статусы карточки
+(«Смотрю / Просмотрено / Запланировано / Продолжение / Брошено»),
+«История», закладки. Локальный кеш расходник, облако CUB оказалось
+ненадёжным («Просмотрено» не хранит вообще, историю капит 500, сверка
+затирает локальные списки) — поэтому отметки живут в **нашем маленьком
+сервисе**, а устройства только зеркалят его.
+
+| Механика | Что происходит |
+|---|---|
+| pull | при старте + вотчдог каждые 5 минут: недостающие отметки вливаются, снятые (tombstone) убираются, съеденное сверкой восстанавливается |
+| push | каждая отметка — ручная, из Plex-импорта, от плеера — уезжает дебаунс-пачкой с карточкой и временем |
+| sync-up | при старте локальные отметки, которых нет в базе, доталкиваются сами — база наполняется с первого запуска любого устройства, серверного засева нет |
+| LWW | запись с бóльшим временем побеждает; снятие отметки — tombstone, разъезжается тоже |
+
+Хранилище — JSON-файл с атомарной заменой (SQL на личные объёмы не
+окупается), доступ по секретному пути, CORS для браузерного клиента.
+Сборка и тесты в CI → `ghcr.io/0x3654/marks`; публичный инстанс —
+`https://marks.0x3654.com`. Чистое устройство или снесённый кеш — всё
+возвращается первым стартом.
+
+## t.js — бутстрап
+
+Один короткий URL для чистой установки Lampa: ставит плагины выше (плюс etor
+— разблокировщик торрентов — и tmdb-proxy), один раз применяет кураторский
+блок настроек (version-gated), выбирает ссылку TorrServer пробой, мигрирует
+старые URL плагинов после переименования репозитория и самолечит глюк
+детекции платформы Apple TV. Источник правд — репо user-site; копия здесь —
+зеркало.
+
+## tracker-top — сервер топов
+
+Go-сервис экранов «Топ · трекеры» и серверной сборки TMDB-топов: один
+статический бинарник в scratch-образе (~11 МБ). Источники: NNMClub
+(`tracker.php?o=10`, видео-поддерево категорий парсится со страницы) и rutor
+(топы по разделам). Философия: **фильмы для просмотра, а не лента раздач** —
+раздачи одного фильма схлопываются в одну позицию.
+
+```
+GET /top?src=both|nnm|rut&cat=video|all&pages=1..3&minq=720|1080|2160&audio=all|dub|no_ts
+GET /feed?...   серверная сборка TMDB-топов с фильтрами и exclude просмотренного
+GET /healthz
+```
+
+Кэш в памяти (TTL 600 с), CORS `*`, зеркала — env `NNM_BASE` / `RUTOR_BASE`.
+CI собирает multi-arch образ `ghcr.io/0x3654/tracker-top` (deps → test →
+build → scratch; сломанный парсер валит сборку; non-root, healthcheck).
+Публичный инстанс: `https://top.0x3654.com`.
+
+## Планы
+
+- [ ] **Синк с seasonvar.ru** — импорт отметок серий аккаунта по образцу
+  plex-sync; API недокументирован (копать грабберы/kodi-плагины),
+  вероятно понадобится прокси как `/plex/`
+- [ ] **Топы по рейтингу** — вариант NNM с сортировкой по рейтингу (`o=5`)
+  рядом с топами по сидам/дате
+- [ ] **Фильтры типов релизов** — разрез фильтров в родном меню торрентов
+  лампы (на уровень выше нашего Torrent Send): camrip / TS / WEBRIP и
+  подобные типы релизов, рядом с существующими фильтрами качества/озвучки
+- [ ] **Быстрый сброс фильтров** — одной кнопкой возвращать состояние
+  фильтров по умолчанию
+- [ ] **Прокси-ротор NNM** — ротация трёх VPS на случай IP-банов
+- [ ] Живая проверка исходящего scrobble в Plex (досмотреть ≥ 90 % в
+  лампе → отметка на сервере Plex)
+
+Сделано из крупного:
+
+- [x] База отметок marks («одна база»: сервер + клиент + бутстрап)
+- [x] Встроенный TorrServer на Apple TV по http
+- [x] Срезы cub на клоне (реклама / аналитика / цензура / Shots / tsarea)
+- [x] Свободные статусы карточки (премиум-гейт CUB снят)
+- [x] Синк Plex↔Lampa (двусторонний, LWW)
+- [x] Вырезана реклама и раздел «Синхронизация» CUB из UI клона
+
+## Разработка
+
+Разработка и тестирование — локально, против локальной лампы; `main` — прод
+(Pages отдаёт плагины устройствам, CI собирает образы tracker-top и marks).
+
+Тесты — в контейнерах (хост не пачкаем):
+
+```bash
+docker run --rm -v "$PWD":/src -w /src node:24-alpine node smoke-top.js
+docker run --rm -v "$PWD":/src -w /src node:24-alpine node smoke-test.js
+docker run --rm -v "$PWD"/tracker-top:/src -w /src golang:1.27-alpine go test ./...
+```
+
+### Локальный контур
+
+Два контейнера на маке; остальные устройства в LAN видят его по Bonjour-имени
+мака (`scutil --get LocalHostName` → `<имя-мака>.local`). Конфиг nginx с
+same-origin-прокси `/topapi` — в репо: [dev/nginx.conf](dev/nginx.conf).
+
+```bash
+# tracker-top под тестом (:8355)
+docker build -t tracker-top:dev tracker-top
+docker run -d --name trackertop-dev -p 8355:8355 \
+    -v trackertop-dev-cache:/data tracker-top:dev
+
+# локальная лампа (:8098): официальный вебрут + конфиг nginx, один раз:
+git clone --depth 1 https://github.com/yumata/lampa ~/code/lampa
+rm -rf ~/code/lampa/.git   # вебрут расходный
+
+docker run -d --name lampa-dev -p 8098:80 \
+  -v "$HOME/code/lampa":/usr/share/nginx/html:ro \
+  -v "$PWD/dev/nginx.conf":/etc/nginx/conf.d/default.conf:ro \
+  nginx:1.27-alpine
+
+# синхронизация правок плагинов в вебрут (после каждой правки; одиночные
+# bind-mount файлов цепляют старый inode и отдавали бы устаревший код):
+cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
+```
+
+Опционально: вывод исходящего трафика tracker-top (Jackett-прокси, трекеры,
+TMDB) через свой VPS — IP мака при интенсивной отладке быстро набирает
+рейт-лимиты. Достаточно чистого SSH-SOCKS-туннеля — HTTP-стек Go понимает
+socks5-прокси из окружения. Туннель эпемерный: поднял на сессию отладки —
+опусти после; без него дев-контейнер теряет внешние запросы (пулы живут
+на дисковом кэше):
+
+```bash
+ssh -fN -D 127.0.0.1:1080 <vps>     # любой VPS с ssh-доступом
+docker run -d --name trackertop-dev -p 8355:8355 -v trackertop-dev-cache:/data \
+    -e HTTP_PROXY=socks5://host.docker.internal:1080 \
+    -e HTTPS_PROXY=socks5://host.docker.internal:1080 \
+    -e NO_PROXY=localhost,127.0.0.1 \
+    tracker-top:dev
+```
+
+Однократно после клона вшить в `~/code/lampa/index.html` дев-хук (перед
+скриптом с `var lampa_url`) — он помечает бутстрап дев-режимом и грузит
+локальный `/t.js`:
+
+```html
+<script>
+    window.TJS_DEV = true
+    ;(function waitLampa(n){
+        if(window.appready || window.Lampa || n > 400){
+            var s = document.createElement('script')
+            // бустер: даже кэшированная страница возьмёт свежий t.js
+            s.src = '/t.js?v=' + Math.floor((new Date()).getTime() / 6e4)
+            document.head.appendChild(s)
+        } else setTimeout(function(){ waitLampa(n + 1) }, 50)
+    })(0)
+</script>
+```
+
+Дальше открываешь страницу — бутстрап делает всё сам:
+
+- **Браузер мака**: `http://localhost:8098` — t.js ставит плагины с того же
+  origin, адрес сервера Топа — same-origin прокси `/topapi` (в dev
+  прописывается на каждом старте), одна перезагрузка. Руками настраивать
+  ничего не надо.
+- **Apple TV**: нативная лампа → «Подмена адреса» →
+  `http://<имя-мака>.local:8098` — оба адреса выводятся из адреса страницы,
+  так что с любого устройства одно и то же (`localhost` на TV — это сам TV).
+- **http — принципиально**: https-страница лампы не может грузить http-плагины
+  и ходить в http-API (mixed content), поэтому локальный бэкенд тестируется
+  только через локально открытую лампу. На http-странице хелпер лампы
+  `protocol()` дефолтит в `https` (storage `protocol` пуст) и шлёт
+  TLS-хендшейки в http-nginx — дев-бутстрап форсит `protocol=http` на
+  каждом старте.
+- Лампа грузит плагины на старте — после правки плагина перезапустить
+  приложение (или перезагрузить страницу).
+
+Заметки:
+
+- Headless-e2e: `mcr.microsoft.com/playwright:v1.49.0-jammy` (тег именно
+  с `.0`), модуль playwright ставить в `/work` контейнера, скрипты монтировать
+  в `/work`; контейнер ходит на мак как `host.docker.internal:8098`.
+- Топ-URL NNM обязан быть с префиксом `/forum/`:
+  `nnmclub.to/forum/tracker.php?o=10` (200; без `/forum/` — 404).
+
+Деплой: пуш в `main` → Pages публикует плагины, CI собирает образ; публичный
+инстанс обновляется из registry.
+
+Точки расширения (сверены по исходникам Lampa 3.3.3): хуки
+`Lampa.Listener('torrent'/'torrent_file', onlong)` добавляют пункты в
+`e.menu`; экраны — `Lampa.InteractionCategory` (приём плагина collections) +
+`Lampa.Api.sources.tmdb.get`; меню `Lampa.Menu.addButton`, настройки
+`Lampa.SettingsApi`.
+
+> [!IMPORTANT]
+> Неофициальный хобби-проект, никакого отношения к Lampa, NNM Club и rutor
+> не имеет. Парсинг трекеров опирается на гостевые страницы и может ломаться
+> при редизайнах.
+
+## Лицензия
+
+MIT © [0x3654](https://github.com/0x3654)
+
+# English
 
 </div>
 
@@ -124,7 +446,7 @@ until an account is linked.
 | Direction | What happens |
 |---|---|
 | Lampa → Plex | finished (≥ 90%) — scrobble on the server; partial — playback position; unmarked — unscrobble |
-| Plex → Lampa | «Sync now» pulls watched items and positions into the Lampa timeline (progress on cards), «Viewing history» and the «Viewed» marks (hiding feeds reads the marks and doesn't depend on history; the plugin also lifts lampa's own history cap of 100 to 1000) |
+| Plex → Lampa | «Sync now» pulls watched items and positions into the Lampa timeline (progress on cards), «Viewing history» and the «Viewed» marks (hiding feeds reads the marks and doesn't depend on history; the plugin also lifts lampa's own history cap of 100 to 5000) |
 
 Matching is exact, by TMDB guids (`tmdb://id` — the Plex Movie/Series
 agents carry them). A local mark newer than the incoming one is never
@@ -133,6 +455,13 @@ on one server propagates to the others by itself. The server address
 defaults to the ru2 tunnel over https (`https://ru2.0x3654.com/plex`;
 plain http would be blocked as mixed content from an https page) — clear
 the field to let the account's own server list pick the address.
+
+The import writes marks both locally (working around the bundle's
+account-sync branch where the lists never grow) and as the cloud event —
+otherwise the reconcile wipes them with its own copy. With the CUB
+account sync on, imported marks used to survive only in the timeline;
+now «History» and «Viewed» land too, and an open Top screen rebuilds
+once the import finishes.
 
 ## marks
 
@@ -143,14 +472,18 @@ not store «Viewed» at all, caps history at 500 and its reconcile wipes
 local lists), so the marks live in **our own tiny service** and every
 device just mirrors it.
 
-| Piece | What it does |
+| Mechanics | What happens |
 |---|---|
-| `marks/` (Go, stdlib only) | JSON-file store with atomic rename; `GET` dump / `POST` LWW-merge + tombstones; secret URL path; 3/3 tests; CI → `ghcr.io/0x3654/marks` |
-| plex-sync client | pull on boot + a 5-minute watchdog (restores whatever a reconcile ate), push of every mark (manual toggles, imports, the player) in a debounced batch, and a boot sync-up that backfills the base from local lists |
-| t.js | sets `marks_url` — the base endpoint; empty keeps the feature dormant |
+| pull | on boot + a 5-minute watchdog: missing marks merge in, unmarked (tombstones) drop out, whatever a reconcile ate comes back |
+| push | every mark — manual toggles, Plex imports, the player — leaves in a debounced batch with the card and a timestamp |
+| sync-up | on boot, local marks missing from the base backfill it — the base fills itself from the first start of any device, no server-side seeding |
+| LWW | the newer timestamp wins; unmarking is a tombstone and travels too |
 
-A fresh device or a wiped cache recovers everything on first start. The
-public instance serves `https://marks.0x3654.com`.
+The store is a JSON file with atomic renames (SQL does not pay off at
+personal scale), reached over a secret URL path, CORS-open for the
+browser client. Build and tests in CI → `ghcr.io/0x3654/marks`; the
+public instance serves `https://marks.0x3654.com`. A fresh device or a
+wiped cache recovers everything on first start.
 
 ## t.js bootstrap
 
@@ -323,298 +656,3 @@ settings `Lampa.SettingsApi`.
 > Unofficial hobby project, no affiliation with Lampa, NNM Club or rutor.
 > Tracker parsing follows guest-accessible pages and may break on redesigns.
 
----
-
-# По-русски
-
-## Установка
-
-В Lampa: Настройки → Расширения → «+», вставить URL (на каждом устройстве
-отдельно; PWA на iPhone — отдельно от вкладки Safari):
-
-| Плагин | URL |
-|---|---|
-| Top | `https://0x3654.github.io/lampa-plugins/top.js` |
-| Torrent Send | `https://0x3654.github.io/lampa-plugins/transmission-send.js` |
-| Plex Sync | `https://0x3654.github.io/lampa-plugins/plex-sync.js` |
-| всё сразу | `https://0x3654.github.io/t.js` (бутстрап, см. ниже) |
-
-## Top — «адекватный топ» вместо ленты
-
-Два пункта в главном меню — основной плагин.
-
-### Топ · TMDB
-
-Популярное/лучшее по TMDB — по три смысла на фильмы и сериалы: тренды недели
-(горячее сейчас), лучшее по рейтингу (классика), новинки 2025+ (широкий
-каталог свежего). Шесть вариантов; «за день» и окна 14/30 дней убраны — они
-совпадали с трендами недели на 78–100%, а окна премьер вмещали 8–15 фильмов.
-Переключение варианта — кнопка **вправо** на экране. Карточки
-и пагинация нативные, запросы идут через API Lampa (учитывается прокси TMDB
-из настроек), экраны открываются мгновенно.
-
-### Топ · трекеры
-
-Топ раздач NNMClub/RUTOR, только видео-категории, обогащённый постерами и
-метаданными TMDB. Клик по карточке — обычная страница фильма в Lampa:
-качество и озвучку выбираешь дальше в парсере, поэтому раздачи одного фильма
-схлопываются в одну позицию. Сортировка (кнопка вправо): по сидам «сейчас»
-или «классика» — завершённость за всё время (NNM `o=6`, rutor в этом режиме
-не участвует). Раздачи, не сматчившиеся с TMDB (софт, игры, сборники), не
-показываются.
-
-Лист фильтров (кнопка вправо) повторяет штатный фильтр торрентов: качество,
-до двух озвучек, тумблеры, «Показать».
-
-### Настройки
-
-Настройки → Топ:
-
-| Параметр | Что делает |
-|---|---|
-| Адрес сервера топа | URL tracker-top (рабочий — `https://top.0x3654.com`) |
-| «Топ» вместо главной | при запуске открывается последний вариант «Топа» вместо ленты |
-| Мин. качество (трекеры) | Любое / 720p+ / 1080p+ / 2160p+ |
-| Озвучка 1 / Озвучка 2 (трекеры) | какие плашки озвучки показывать (напр. Дубляж + Многоголосый) |
-| Скрывать просмотренные | исключать просмотренное по истории Lampa, на сервере |
-| Только с раздачами | в «Топе · TMDB» показывать только фильмы, у которых на трекерах есть раздача под наши фильтры |
-| Скрыть сериалы | «Топ · трекеры»: только фильмы |
-| Только на русском | скрывать раздачи/карточки совсем без русских букв в названии |
-| Скрыть аниме | «Топ · трекеры»: японские аниме прочь, мультики остаются (вкл по умолчанию) |
-| Скрывать CAM/TS | камрипы и «звук с TS» вычищаются ДО дедупа: фильм только с такими раздачами исчезает целиком, с нормальной — остаётся с ней (вкл по умолчанию) |
-
-## Torrent Send — отправка в торрент-клиент
-
-Два способа отправить раздачу из меню долгого нажатия (работает с любым
-трекером — магнет парсера уходит как есть):
-
-| Пункт | Когда показывается | Что делает |
-|---|---|---|
-| **Скопировать магнет** | есть магнет | магнет в буфер обмена |
-| **Открыть магнет** | есть магнет | `window.location = magnet:` → системный обработчик схемы |
-| **Добавить в Plex** (всегда последним) | есть магнет | раздача → личная лента «авто» [nnm-rss](https://github.com/0x3654/nnm-rss) → transmission-rss качает в библиотеку Plex; повторное добавление — «Уже в ленте» |
-
-Бывший плагин nnm-auto.js влит в Torrent Send; файл остаётся заглушкой — на
-устройствах, где он был установлен, удалите расширение.
-
-> [!NOTE]
-> Transmission 4.1.3 убрал CORS-заголовки из RPC, поэтому браузер/PWA не могут
-> обращаться к нему напрямую — Torrent Send идёт через системные обработчики
-> `magnet:` и нативные клиенты, а не через `fetch`.
-
-Системного UI для схем на macOS нет; обработчик переключается записью в
-LaunchServices (TRG для примера, bundle id `com.transgui`):
-
-```bash
-defaults write com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers \
-  -array-add '<dict><key>LSHandlerURLScheme</key><string>magnet</string>\
-<key>LSHandlerRoleAll</key><string>com.transgui</string></dict>'
-killall lsd
-```
-
-Проверить: `open 'magnet:?xt=urn:btih:0000000000000000000000000000000000000000'`.
-Bundle id любого приложения: `osascript -e 'id of app "Имя"'`.
-
-### «Добавить в Plex» — доступы
-
-Настройки → NNM RSS (nnm.0x3654.com):
-
-| Параметр | Что делает |
-|---|---|
-| Адрес сервера | URL сервиса nnm-rss (предзаполнен `https://nnm.0x3654.com`) |
-| Логин / Пароль | аккаунт на сервисе (регистрация на его главной); пароль лежит в localStorage устройства и в настройках скрыт точками |
-| Проверить вход | кнопка: логинится текущим логином/паролем, статус прямо в строке (✓ зелёным / ✗ красным) |
-
-Авторизация: JSON-логин → токен (кэшируется на пару сервер+логин), далее
-`Authorization: Bearer`; при 401 (смена пароля ротирует токен) — перелогин и
-один повтор.
-
-## Plex Sync — статус просмотра
-
-Двусторонний статус просмотра с аккаунтом Plex (Настройки → Plex).
-Привязка — кодом plex.tv/link (или ручным X-Plex-Token); сервер аккаунта
-определяется сам, ручной LAN-адрес — опционально. До привязки аккаунта
-ничего не отправляется.
-
-| Направление | Что происходит |
-|---|---|
-| Lampa → Plex | досмотрели (≥ 90%) — scrobble на сервере; частичный просмотр — позиция; сняли отметку — unscrobble |
-| Plex → Lampa | «Синхронизировать» переносит просмотренное и позиции в таймлайн Lampa (прогресс на карточках), «Историю просмотров» и отметки «Просмотрено» (скрытие лент читает отметки и не зависит от истории; заодно плагин поднимает сам лимит истории лампы со 100 до 1000) |
-
-Матчинг точный, по TMDB-гуидам (`tmdb://id` — их несут агенты Plex
-Movie/Series). Локальная отметка новее входящей не затирается (LWW). С
-включённым «Sync Watch State» у аккаунта отметка на одном сервере сама
-разъедется по остальным. Адрес сервера по умолчанию — тоннель на ru2 по
-https (`https://ru2.0x3654.com/plex`; чистый http с https-страницы браузер
-режет как mixed content); очистите поле — плагин возьмёт адрес
-из списка серверов аккаунта.
-
-## t.js — бутстрап
-
-Один короткий URL для чистой установки Lampa: ставит плагины выше (плюс etor
-— разблокировщик торрентов — и tmdb-proxy), один раз применяет кураторский
-блок настроек (version-gated), выбирает ссылку TorrServer пробой, мигрирует
-старые URL плагинов после переименования репозитория и самолечит глюк
-детекции платформы Apple TV. Источник правд — репо user-site; копия здесь —
-зеркало.
-
-## tracker-top — сервер топов
-
-Go-сервис экранов «Топ · трекеры» и серверной сборки TMDB-топов: один
-статический бинарник в scratch-образе (~11 МБ). Источники: NNMClub
-(`tracker.php?o=10`, видео-поддерево категорий парсится со страницы) и rutor
-(топы по разделам). Философия: **фильмы для просмотра, а не лента раздач** —
-раздачи одного фильма схлопываются в одну позицию.
-
-```
-GET /top?src=both|nnm|rut&cat=video|all&pages=1..3&minq=720|1080|2160&audio=all|dub|no_ts
-GET /feed?...   серверная сборка TMDB-топов с фильтрами и exclude просмотренного
-GET /healthz
-```
-
-Кэш в памяти (TTL 600 с), CORS `*`, зеркала — env `NNM_BASE` / `RUTOR_BASE`.
-CI собирает multi-arch образ `ghcr.io/0x3654/tracker-top` (deps → test →
-build → scratch; сломанный парсер валит сборку; non-root, healthcheck).
-Публичный инстанс: `https://top.0x3654.com`.
-
-## Планы
-
-- [ ] **Синк с seasonvar.ru** — импорт отметок серий аккаунта по образцу
-  plex-sync; API недокументирован (копать грабберы/kodi-плагины),
-  вероятно понадобится прокси как `/plex/`
-- [ ] **Топы по рейтингу** — вариант NNM с сортировкой по рейтингу (`o=5`)
-  рядом с топами по сидам/дате
-- [ ] **Фильтры типов релизов** — разрез фильтров в родном меню торрентов
-  лампы (на уровень выше нашего Torrent Send): camrip / TS / WEBRIP и
-  подобные типы релизов, рядом с существующими фильтрами качества/озвучки
-- [ ] **Быстрый сброс фильтров** — одной кнопкой возвращать состояние
-  фильтров по умолчанию
-- [ ] **Прокси-ротор NNM** — ротация трёх VPS на случай IP-банов
-- [ ] Живая проверка исходящего scrobble в Plex (досмотреть ≥ 90 % в
-  лампе → отметка на сервере Plex)
-
-Сделано из крупного:
-
-- [x] База отметок marks («одна база»: сервер + клиент + бутстрап)
-- [x] Встроенный TorrServer на Apple TV по http
-- [x] Срезы cub на клоне (реклама / аналитика / цензура / Shots / tsarea)
-- [x] Свободные статусы карточки (премиум-гейт CUB снят)
-- [x] Синк Plex↔Lampa (двусторонний, LWW)
-- [x] Вырезана реклама и раздел «Синхронизация» CUB из UI клона
-
-## Разработка
-
-Разработка и тестирование — локально, против локальной лампы; `main` — прод
-(Pages отдаёт плагины устройствам, CI собирает образы tracker-top и marks).
-
-Тесты — в контейнерах (хост не пачкаем):
-
-```bash
-docker run --rm -v "$PWD":/src -w /src node:24-alpine node smoke-top.js
-docker run --rm -v "$PWD":/src -w /src node:24-alpine node smoke-test.js
-docker run --rm -v "$PWD"/tracker-top:/src -w /src golang:1.27-alpine go test ./...
-```
-
-### Локальный контур
-
-Два контейнера на маке; остальные устройства в LAN видят его по Bonjour-имени
-мака (`scutil --get LocalHostName` → `<имя-мака>.local`). Конфиг nginx с
-same-origin-прокси `/topapi` — в репо: [dev/nginx.conf](dev/nginx.conf).
-
-```bash
-# tracker-top под тестом (:8355)
-docker build -t tracker-top:dev tracker-top
-docker run -d --name trackertop-dev -p 8355:8355 \
-    -v trackertop-dev-cache:/data tracker-top:dev
-
-# локальная лампа (:8098): официальный вебрут + конфиг nginx, один раз:
-git clone --depth 1 https://github.com/yumata/lampa ~/code/lampa
-rm -rf ~/code/lampa/.git   # вебрут расходный
-
-docker run -d --name lampa-dev -p 8098:80 \
-  -v "$HOME/code/lampa":/usr/share/nginx/html:ro \
-  -v "$PWD/dev/nginx.conf":/etc/nginx/conf.d/default.conf:ro \
-  nginx:1.27-alpine
-
-# синхронизация правок плагинов в вебрут (после каждой правки; одиночные
-# bind-mount файлов цепляют старый inode и отдавали бы устаревший код):
-cp top.js transmission-send.js t.js plex-sync.js ~/code/lampa/
-```
-
-Опционально: вывод исходящего трафика tracker-top (Jackett-прокси, трекеры,
-TMDB) через свой VPS — IP мака при интенсивной отладке быстро набирает
-рейт-лимиты. Достаточно чистого SSH-SOCKS-туннеля — HTTP-стек Go понимает
-socks5-прокси из окружения. Туннель эпемерный: поднял на сессию отладки —
-опусти после; без него дев-контейнер теряет внешние запросы (пулы живут
-на дисковом кэше):
-
-```bash
-ssh -fN -D 127.0.0.1:1080 <vps>     # любой VPS с ssh-доступом
-docker run -d --name trackertop-dev -p 8355:8355 -v trackertop-dev-cache:/data \
-    -e HTTP_PROXY=socks5://host.docker.internal:1080 \
-    -e HTTPS_PROXY=socks5://host.docker.internal:1080 \
-    -e NO_PROXY=localhost,127.0.0.1 \
-    tracker-top:dev
-```
-
-Однократно после клона вшить в `~/code/lampa/index.html` дев-хук (перед
-скриптом с `var lampa_url`) — он помечает бутстрап дев-режимом и грузит
-локальный `/t.js`:
-
-```html
-<script>
-    window.TJS_DEV = true
-    ;(function waitLampa(n){
-        if(window.appready || window.Lampa || n > 400){
-            var s = document.createElement('script')
-            // бустер: даже кэшированная страница возьмёт свежий t.js
-            s.src = '/t.js?v=' + Math.floor((new Date()).getTime() / 6e4)
-            document.head.appendChild(s)
-        } else setTimeout(function(){ waitLampa(n + 1) }, 50)
-    })(0)
-</script>
-```
-
-Дальше открываешь страницу — бутстрап делает всё сам:
-
-- **Браузер мака**: `http://localhost:8098` — t.js ставит плагины с того же
-  origin, адрес сервера Топа — same-origin прокси `/topapi` (в dev
-  прописывается на каждом старте), одна перезагрузка. Руками настраивать
-  ничего не надо.
-- **Apple TV**: нативная лампа → «Подмена адреса» →
-  `http://<имя-мака>.local:8098` — оба адреса выводятся из адреса страницы,
-  так что с любого устройства одно и то же (`localhost` на TV — это сам TV).
-- **http — принципиально**: https-страница лампы не может грузить http-плагины
-  и ходить в http-API (mixed content), поэтому локальный бэкенд тестируется
-  только через локально открытую лампу. На http-странице хелпер лампы
-  `protocol()` дефолтит в `https` (storage `protocol` пуст) и шлёт
-  TLS-хендшейки в http-nginx — дев-бутстрап форсит `protocol=http` на
-  каждом старте.
-- Лампа грузит плагины на старте — после правки плагина перезапустить
-  приложение (или перезагрузить страницу).
-
-Заметки:
-
-- Headless-e2e: `mcr.microsoft.com/playwright:v1.49.0-jammy` (тег именно
-  с `.0`), модуль playwright ставить в `/work` контейнера, скрипты монтировать
-  в `/work`; контейнер ходит на мак как `host.docker.internal:8098`.
-- Топ-URL NNM обязан быть с префиксом `/forum/`:
-  `nnmclub.to/forum/tracker.php?o=10` (200; без `/forum/` — 404).
-
-Деплой: пуш в `main` → Pages публикует плагины, CI собирает образ; публичный
-инстанс обновляется из registry.
-
-Точки расширения (сверены по исходникам Lampa 3.3.3): хуки
-`Lampa.Listener('torrent'/'torrent_file', onlong)` добавляют пункты в
-`e.menu`; экраны — `Lampa.InteractionCategory` (приём плагина collections) +
-`Lampa.Api.sources.tmdb.get`; меню `Lampa.Menu.addButton`, настройки
-`Lampa.SettingsApi`.
-
-> [!IMPORTANT]
-> Неофициальный хобби-проект, никакого отношения к Lampa, NNM Club и rutor
-> не имеет. Парсинг трекеров опирается на гостевые страницы и может ломаться
-> при редизайнах.
-
-## Лицензия
-
-MIT © [0x3654](https://github.com/0x3654)
