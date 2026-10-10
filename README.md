@@ -1,13 +1,14 @@
+<div align="center">
+
 # 🔌 Lampa Plugins
 
-**Plugins for the [Lampa](https://lampa.mx) media app and the tracker-top backend**
+**Плагины для [Lampa](https://lampa.mx) и свой бэкенд: топы трекеров, Plex-синк, база отметок**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-0x3654.svg)](LICENSE)
-[![Pages](https://img.shields.io/badge/install-GitHub%20Pages-222222.svg)](https://0x3654.github.io/lampa-plugins/)
-[![Docker](https://img.shields.io/badge/tracker--top-ghcr.io%2F0x3654-2496ED.svg)](https://github.com/0x3654/lampa-plugins/pkgs/container/tracker-top)
-[![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)](https://go.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0x3654.svg)](LICENSE) [![Pages](https://img.shields.io/badge/install-GitHub%20Pages-222222.svg)](https://0x3654.github.io/lampa-plugins/) [![tracker-top](https://img.shields.io/badge/ghcr-tracker--top-2496ED.svg)](https://github.com/0x3654/lampa-plugins/pkgs/container/tracker-top) [![marks](https://img.shields.io/badge/ghcr-marks-2496ED.svg)](https://github.com/0x3654/lampa-plugins/pkgs/container/marks) [![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)](https://go.dev)
 
-[Установка](#установка) · [Top](#top--адекватный-топ-вместо-ленты) · [Torrent Send](#torrent-send--отправка-в-торрент-клиент) · [Plex Sync](#plex-sync--статус-просмотра) · [marks](#marks-база-отметок) · [t.js](#tjs-бутстрап) · [tracker-top](#tracker-top--сервер-топов) · [Разработка](#разработка) · [English](#english)
+[Установка](#-установка) · [Top](#-top--адекватный-топ-вместо-ленты) · [Torrent Send](#-torrent-send--отправка-в-торрент-клиент) · [Plex Sync](#-plex-sync--статус-просмотра) · [marks](#-marks--база-отметок) · [t.js](#-tjs--бутстрап) · [tracker-top](#-tracker-top--сервер-топов) · [Планы](#-планы) · [Разработка](#-разработка) · [English](#english)
+
+</div>
 
 
 
