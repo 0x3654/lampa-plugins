@@ -8,6 +8,8 @@
 
 [Установка](#-установка) · [Top](#-top--адекватный-топ-вместо-ленты) · [Torrent Send](#-torrent-send--отправка-в-торрент-клиент) · [Plex Sync](#-plex-sync--статус-просмотра) · [marks](#-marks--база-отметок) · [t.js](#-tjs--бутстрап) · [tracker-top](#-tracker-top--сервер-топов) · [Планы](#-планы) · [Разработка](#-разработка) · [English](#english)
 
+<img src="docs/header.webp" width="700" alt="Lampa Plugins comic">
+
 </div>
 
 
