@@ -1,16 +1,19 @@
 /*
     Top — плагин Lampa (lampa.mx)
 
-    Три пункта в меню:
+    Четыре пункта в меню:
       • «Топ»           — популярное/лучшее по TMDB (тренды за день/неделю, топ по рейтингу,
                           новинки); переключение варианта — кнопка вправо
       • «Топ трекеров»  — топ раздач NNMClub/RUTOR по сидам или завершённости,
                           обогащённый постерами TMDB; сервер tracker-top (tracker-top/ в репо)
+      • «Seasonvar»     — топ/новинки/обновления seasonvar.ru + «Отслеживаемые» акка;
+                          статусы просмотра читаются и пишутся через tracker-top (/seasonvar),
+                          досмотренная в Lampa серия автоматически отмечается на сайте
       • «Мой фильтр»    — последний применённый фильтр каталога (Lampa их не помнит —
                           мы запоминаем на событии activity и открываем одним нажатием)
 
     Настройки: Настройки → Топ — адрес сервера, «Топ» вместо главной, минимальное
-    качество, скрытие CAM/TS-раздач, только дубляж.
+    качество, скрытие CAM/TS-раздач, только дубляж; Настройки → Seasonvar — логин/пароль.
 
     Установка: Настройки → Расширения → «+» → URL этого файла.
 */
@@ -41,7 +44,7 @@
                     if((list[i].url || '') === url && list[i].name !== 'Топ — топы и фильтры'){
                         list[i].name   = 'Топ — топы и фильтры'
                         list[i].author = '@0x3654'
-                        list[i].descr  = 'Топ TMDB, топ трекеров NNMClub/RUTOR, «Мой фильтр»'
+                        list[i].descr  = 'Топ TMDB, топ трекеров, Seasonvar, «Мой фильтр»'
                         named = true
                     }
                 }
@@ -90,6 +93,29 @@
             top_no:                 { ru: 'нет',                    en: 'no' },
             top_settings_hide_watched: { ru: 'Скрывать просмотренные', en: 'Hide watched' },
             top_settings_hide_watched_desc: { ru: 'только в «Топе» и «Топе трекеров», по истории Lampa', en: 'only in Top screens, uses Lampa history' },
+
+            top_menu_seasonvar:     { ru: 'Seasonvar',                en: 'Seasonvar' },
+            top_sv_settings_name:   { ru: 'Seasonvar',                en: 'Seasonvar' },
+            top_sv_login:           { ru: 'Логин Seasonvar',          en: 'Seasonvar login' },
+            top_sv_login_descr:     { ru: 'e-mail аккаунта seasonvar.ru', en: 'seasonvar.ru account e-mail' },
+            top_sv_passw:           { ru: 'Пароль Seasonvar',         en: 'Seasonvar password' },
+            top_sv_status:          { ru: 'Сессия · войти / обновить', en: 'Session · sign in / refresh' },
+            top_sv_ok:              { ru: 'сессия жива',              en: 'session ok' },
+            top_sv_no_session:      { ru: 'нет сессии — заполните логин/пароль и войдите', en: 'no session — fill in login/password' },
+            top_sv_login_ok:        { ru: 'Seasonvar: сессия получена', en: 'Seasonvar: session ok' },
+            top_sv_login_fail:      { ru: 'Seasonvar: не удалось войти', en: 'Seasonvar: login failed' },
+            top_sv_session_dead:    { ru: 'Сессия Seasonvar истекла — обновите в настройках', en: 'Seasonvar session expired — refresh in settings' },
+            top_sv_mark_menu:       { ru: 'Отметка просмотра…',       en: 'Watching mark…' },
+            top_sv_no_serials:      { ru: 'На экране нет сериалов',   en: 'No shows on screen' },
+            top_sv_mark_seria:      { ru: 'Отметить серию…',          en: 'Mark episode…' },
+            top_sv_seria:           { ru: 'серия',                    en: 'episode' },
+            top_sv_mark_season:     { ru: 'Сезон просмотрен',         en: 'Season watched' },
+            top_sv_mark_want:       { ru: 'Хочу посмотреть',          en: 'Want to see' },
+            top_sv_mark_del:        { ru: 'Снять отметку',            en: 'Remove mark' },
+            top_sv_marked:          { ru: 'Отметка поставлена',       en: 'Marked' },
+            top_sv_mark_fail:       { ru: 'Отметка не удалась',       en: 'Mark failed' },
+            top_sv_scrobble:        { ru: 'Скроббл в Seasonvar',      en: 'Scrobble to Seasonvar' },
+            top_sv_scrobble_descr:  { ru: 'досмотренная в Lampa серия (≥90%) автоматически отмечается на seasonvar.ru', en: 'episodes finished in Lampa (≥90%) are marked on seasonvar.ru' },
         })
 
         function T(name){
@@ -222,6 +248,9 @@
                     Lampa.Select.close()
 
                     if(item.go) return apply()
+
+                    // свой обработчик ряда (не пересобирает экран)
+                    if(item.custom) return item.custom()
 
                     if(item.variants){
                         Lampa.Select.show({
@@ -952,6 +981,27 @@
             }, 60 * 60 * 24)
         }
 
+        // seasonvar — только сериалы: ищем в TMDB по tv, не multi (фильм
+        // «Ронин» 1998 не должен матчиться русскому сериалу), и всегда
+        // с годом: у seasonvar год конкретного сезона, у TMDB — первого,
+        // потому в match-входе season=true (допуск ±6 из pickBest)
+        function svMatchOne(item, cb){
+            var query = item.orig || item.ru || ''
+
+            if(!query) return cb(null)
+
+            Lampa.Api.sources.tmdb.get('search/tv', { query: query }, function(json){
+                var results = (json.results || []).map(function(r){
+                    r.media_type = 'tv'
+                    return r
+                })
+
+                cb(pickBest(results, item))
+            }, function(){
+                cb(null)
+            }, 60 * 60 * 24)
+        }
+
         // map с ограничением параллельности, порядок сохраняем
         function mapLimit(arr, limit, fn, done){
             var out = new Array(arr.length)
@@ -1141,10 +1191,500 @@
         }
 
 
+        //---------- Seasonvar: топ seasonvar.ru + статусы просмотра
+
+        // % серии, после которых скроббл ставит отметку (как у plex-sync)
+        var SV_WATCHED = 90
+
+        // варианты экрана: первые три — блоки главной seasonvar,
+        // четвёртый — «Отслеживаемые» акка (вкладка «с обновлениями» + без)
+        var SV_TABS = [
+            { title: 'Топ',           mode: 'pop' },
+            { title: 'Новинки',       mode: 'newest' },
+            { title: 'Обновления',    mode: 'new' },
+            { title: 'Отслеживаемые', mode: 'tracking' }
+        ]
+
+        var svNet = new Lampa.Reguest()
+
+        // несохранённый ключ Lampa отдаёт как undefined — String() даёт
+        // 'undefined' и портит проверки; приводим к ''
+        function svField(name){
+            var v = String(Lampa.Storage.field(name) || '')
+
+            return (v === 'undefined' || v === 'null') ? '' : v
+        }
+
+        // сохранённый вариант: несохранённый ключ Lampa отдаёт как строку
+        // 'undefined'/'null' — это «не выбрано», дефолт pop
+        function svTabSaved(){
+            var v = String(field('top_seasonvar_tab'))
+
+            for(var i = 0; i < SV_TABS.length; i++){
+                if(SV_TABS[i].mode === v) return SV_TABS[i].mode
+            }
+
+            return 'pop'
+        }
+
+        function svTabOf(object){
+            var want = object.sv_tab || svTabSaved()
+
+            for(var i = 0; i < SV_TABS.length; i++){
+                if(SV_TABS[i].mode === want) return SV_TABS[i]
+            }
+
+            return SV_TABS[0]
+        }
+
+        function svSk(){
+            return svField('seasonvar_sk')
+        }
+
+        // логин: creds в настройках устройства, svid1 (~30 дней) — в Storage;
+        // сервер их не хранит, только единожды логинится за нас
+        function svLogin(force, cb){
+            var login = svField('seasonvar_login').trim()
+            var passw = svField('seasonvar_passw')
+
+            if(!login || !passw) return cb(false)
+
+            if(svSk() && !force) return cb(true)
+
+            var base = serverUrl()
+
+            if(!base) return cb(false)
+
+            svNet.timeout(20000)
+            svNet.silent(base + '/seasonvar/login?login=' + encodeURIComponent(login) +
+                '&passw=' + encodeURIComponent(passw), function(json){
+                if(json && json.ok && json.sk){
+                    Lampa.Storage.set('seasonvar_sk', json.sk)
+                    cb(true)
+                }
+                else cb(false)
+            }, function(){
+                cb(false)
+            })
+        }
+
+        // карта tmdb→seasonvar: заполняется, когда экран Seasonvar сматчил
+        // карточку; без неё скроббл тихо пропускает серию
+        function svMapRemember(el){
+            try{
+                var map = Lampa.Storage.get('seasonvar_map', {})
+
+                map[el.id] = { sid: el.sv.id, path: el.sv.path, ru: el.sv.ru, ts: Date.now() }
+
+                var keys = Object.keys(map).sort(function(a, b){ return map[a].ts - map[b].ts })
+
+                while(keys.length > 300) delete map[keys.shift()]
+
+                Lampa.Storage.set('seasonvar_map', map)
+            }
+            catch(e){}
+        }
+
+        // номер сезона → seasonId: список сезонов сериала, кэш на месяц
+        function svPickSeason(list, season){
+            if(!list || !list.length) return null
+
+            for(var i = 0; i < list.length; i++){
+                if(list[i].season && list[i].season === season) return list[i]
+            }
+
+            return list.length === 1 ? list[0] : null // минисериал без номера сезона
+        }
+
+        function svSeasonRef(entry, season, cb){
+            var cache = Lampa.Storage.get('seasonvar_seasons', {})
+            var key = entry.sid + ''
+
+            if(cache[key] && cache[key].list && Date.now() - cache[key].ts < 30 * 86400000){
+                return cb(svPickSeason(cache[key].list, season))
+            }
+
+            var base = serverUrl()
+
+            if(!base) return cb(null)
+
+            svNet.timeout(20000)
+            svNet.silent(base + '/seasonvar/serial?path=' + encodeURIComponent(entry.path), function(s){
+                var list = ((s && s.seasons) || []).map(function(r){
+                    return { id: r.id, path: r.path, season: r.season, current: r.current }
+                })
+
+                cache[key] = { list: list, ts: Date.now() }
+
+                var keys = Object.keys(cache)
+
+                while(keys.length > 100) delete cache[keys.shift()]
+
+                Lampa.Storage.set('seasonvar_seasons', cache)
+                cb(svPickSeason(list, season))
+            }, function(){
+                cb(null)
+            })
+        }
+
+        // запись отметки (mode=pause|season|want|del) — сквозь прокси
+        function svMark(params, cb){
+            var go = function(sk){
+                var base = serverUrl()
+
+                if(!base) return cb(false)
+
+                var q = '/seasonvar/mark?sk=' + encodeURIComponent(sk)
+
+                for(var k in params) q += '&' + k + '=' + encodeURIComponent(params[k])
+
+                svNet.timeout(20000)
+                svNet.silent(base + q, function(json){
+                    cb(!!(json && json.msg === 'success'))
+                }, function(){
+                    cb(false)
+                })
+            }
+
+            if(svSk()) go(svSk())
+            else svLogin(false, function(ok){
+                if(ok) go(svSk())
+                else cb(false)
+            })
+        }
+
+        // показанные карточки экрана Seasonvar — для ручных отметок
+        var svShown = []
+
+        // ручные отметки: сериал → действие → (номер серии)
+        function svMarkMenu(){
+            if(!svShown.length) return Lampa.Noty.show(T('sv_no_serials'), { time: 4000 })
+
+            Lampa.Select.show({
+                title: T('sv_mark_menu'),
+                items: svShown.map(function(el){
+                    return {
+                        title: (el.sv.ru || el.name || '') +
+                            (el.sv.season ? ' · S' + el.sv.season : '') +
+                            (el.sv.total ? ' · ' + el.sv.watched + '/' + el.sv.total : ''),
+                        card: el
+                    }
+                }),
+                onBack: function(){
+                    Lampa.Controller.toggle('content')
+                },
+                onSelect: function(item){
+                    Lampa.Select.close()
+                    svMarkActions(item.card)
+                }
+            })
+        }
+
+        function svMarkActions(el){
+            var ACTIONS = {
+                pause:  T('sv_mark_seria'),
+                season: T('sv_mark_season'),
+                want:   T('sv_mark_want'),
+                del:    T('sv_mark_del')
+            }
+
+            Lampa.Select.show({
+                title: el.sv.ru || el.name || '',
+                items: Object.keys(ACTIONS).map(function(k){
+                    return { title: ACTIONS[k], action: k }
+                }),
+                onBack: function(){
+                    Lampa.Controller.toggle('content')
+                },
+                onSelect: function(item){
+                    Lampa.Select.close()
+
+                    var send = function(seria){
+                        var params = { id: el.sv.id, path: el.sv.path }
+
+                        if(item.action === 'pause'){
+                            params.mode = 'pause'
+                            params.seria = seria
+                        }
+                        else params.mode = item.action
+
+                        svMark(params, function(ok){
+                            Lampa.Noty.show(ok ? T('sv_marked') : T('sv_mark_fail'), { style: ok ? '' : 'error', time: 4000 })
+                        })
+                    }
+
+                    if(item.action !== 'pause') return send(0)
+
+                    var count = el.sv.total || 16
+                    var eps = []
+
+                    for(var n = 1; n <= count; n++) eps.push({ title: n + ' ' + T('sv_seria'), seria: n })
+
+                    Lampa.Select.show({
+                        title: T('sv_mark_seria'),
+                        items: eps,
+                        onBack: function(){
+                            Lampa.Controller.toggle('content')
+                        },
+                        onSelect: function(chosen){
+                            Lampa.Select.close()
+                            send(chosen.seria)
+                        }
+                    })
+                }
+            })
+        }
+
+        // ---------- авто-скроббл: контекст эпизода со старта плеера,
+        // прогресс из шины таймлайна (архитектура plex-sync)
+
+        var svMeta = {}
+
+        function svPlayerStart(data){
+            if(!data || !data.timeline) return
+
+            var card = data.card || data.movie || {}
+            var ep   = (data.movie && data.movie !== card) ? data.movie : ((card.season_number != null && card.episode_number != null) ? card : null)
+            var s    = (ep && ep.season_number != null) ? ep : null
+
+            if(!s || s.episode_number == null) return
+
+            var tmdb = parseInt(s.show_id, 10) || ((s !== card) ? parseInt(card.id, 10) : 0)
+
+            if(tmdb) svMeta[String(data.timeline.hash)] = {
+                tmdb: tmdb,
+                season: parseInt(s.season_number, 10),
+                episode: parseInt(s.episode_number, 10)
+            }
+        }
+
+        function svTimelineChange(e){
+            if(field('seasonvar_scrobble') === 'false') return
+            if(!e || e.target !== 'timeline' || e.reason !== 'update') return
+
+            var hash = e.data && String(e.data.hash)
+            var m    = hash && svMeta[hash]
+
+            if(!m || !m.episode) return // только эпизоды — фильмы seasonvar не отмечает
+
+            var out = Lampa.Storage.get('seasonvar_out', {})
+
+            out[hash] = {
+                tmdb: m.tmdb, season: m.season, episode: m.episode,
+                percent: (e.data.road && e.data.road.percent) || 0,
+                ts: Date.now()
+            }
+
+            Lampa.Storage.set('seasonvar_out', out)
+        }
+
+        function svFlush(){
+            var out   = Lampa.Storage.get('seasonvar_out', {})
+            var marks = Lampa.Storage.get('seasonvar_scrobbled', {})
+            var keys  = []
+
+            for(var h in out){
+                if(Date.now() - out[h].ts > 7 * 86400000) delete out[h] // хвосты без надежды
+                else if(out[h].percent >= SV_WATCHED && !marks[h]) keys.push(h)
+            }
+
+            if(!keys.length){
+                Lampa.Storage.set('seasonvar_out', out) // вычищенные хвосты сохраняем
+                return
+            }
+
+            var map = Lampa.Storage.get('seasonvar_map', {})
+
+            mapLimit(keys, 1, function(hash, next){
+                var item = out[hash]
+                var entry = map[item.tmdb]
+
+                if(!entry) return next() // не из топа Seasonvar — тихо мимо
+
+                svSeasonRef(entry, item.season, function(ref){
+                    if(!ref) return next()
+
+                    svMark({ mode: 'pause', id: ref.id, seria: item.episode, path: ref.path }, function(ok){
+                        if(ok) marks[hash] = Date.now()
+                        next()
+                    })
+                })
+            }, function(){
+                for(var h in marks) delete out[h]
+
+                Lampa.Storage.set('seasonvar_out', out)
+                Lampa.Storage.set('seasonvar_scrobbled', marks)
+            })
+        }
+
+        //---------- экран «Seasonvar»
+
+        function SeasonvarScreen(object){
+            var comp = new Lampa.InteractionCategory(object)
+            var net  = new Lampa.Reguest()
+            var tab  = svTabOf(object)
+
+            // плашки: прогресс сезона «2/8» (или S2 — номер сезона), ✓ —
+            // просмотрено по истории Lampa или целиком по seasonvar
+            trackCards(comp, {
+                voiceOf: function(el){
+                    if(!el.sv) return ''
+                    if(el.sv.total) return el.sv.watched + '/' + el.sv.total
+                    return el.sv.season ? 'S' + el.sv.season : ''
+                },
+                watchedOf: function(el){
+                    if(el.sv && el.sv.total && el.sv.watched >= el.sv.total) return true
+
+                    var w = watchedSet()
+
+                    return w[(el.name ? 'tv' : 'movie') + ':' + el.id] === true
+                }
+            })
+            hideWatched(comp)
+            dedupeCards(comp)
+
+            function loadItems(ok, fail){
+                var base = serverUrl()
+
+                if(!base) return fail()
+
+                net.timeout(30000)
+
+                if(tab.mode !== 'tracking'){
+                    net.silent(base + '/seasonvar/home?mode=' + tab.mode, function(json){
+                        ok((json && json.items) || [])
+                    }, fail)
+
+                    return
+                }
+
+                var goTrack = function(){
+                    net.silent(base + '/seasonvar/tracking?sk=' + encodeURIComponent(svSk()), function(json){
+                        if(!json || json.ok === false){
+                            Lampa.Noty.show(T('sv_session_dead'), { style: 'error', time: 6000 })
+                            return fail()
+                        }
+
+                        ok(((json.tabs && json.tabs.new) || []).concat((json.tabs && json.tabs.nonew) || []))
+                    }, fail)
+                }
+
+                if(svSk()) goTrack()
+                else svLogin(false, function(okL){
+                    if(okL) goTrack()
+                    else{
+                        Lampa.Noty.show(T('sv_no_session'), { time: 6000 })
+                        fail()
+                    }
+                })
+            }
+
+            comp.create = function(){
+                var self = this
+
+                var base = serverUrl()
+
+                if(!base){
+                    Lampa.Noty.show(T('need_server'), { time: 6000 })
+                    Lampa.Settings.create('top')
+
+                    this.activity.loader(false)
+                    this.activity.toggle()
+
+                    return
+                }
+
+                this.activity.loader(true)
+
+                loadItems(function(items){
+                    // матч-вход: имя + год (год добирает сервер страницей
+                    // сезона), season=true — год с допуском сезона
+                    var input = items.map(function(it){
+                        return { ru: it.ru, orig: it.orig, year: it.year || 0, season: true, src: it }
+                    })
+
+                    mapLimit(input, 4, svMatchOne, function(matched){
+                        var results = []
+                        var seen = {}
+
+                        for(var i = 0; i < matched.length; i++){
+                            var el = matched[i]
+
+                            if(!el) continue // нет постера TMDB — карточку не собрать
+
+                            var key = el.media_type + ':' + el.id
+
+                            if(seen[key]) continue
+                            seen[key] = true
+
+                            el.source = 'tmdb'
+                            el.sv = input[i].src
+
+                            svMapRemember(el)
+
+                            results.push(el)
+                        }
+
+                        svShown = results
+
+                        if(!results.length) comp.empty()
+                        else comp.build({ results: results, total_pages: 1 })
+                    })
+                }, function(a, b){
+                    var why = ''
+
+                    if(typeof a === 'object' && a) why = JSON.stringify(a).slice(0, 100)
+                    else if(a) why = String(a).slice(0, 100)
+
+                    Lampa.Noty.show(T('server_fail') + (why ? ': ' + why : ''), { style: 'error', time: 8000 })
+
+                    comp.empty()
+                })
+            }
+
+            comp.onRight = function(){
+                var TABS = {}
+
+                SV_TABS.forEach(function(t){ TABS[t.mode] = t.title })
+
+                filterSheet([
+                    {
+                        title: T('variants') + ': ' + (TABS[field('top_seasonvar_tab')] || TABS.pop),
+                        values: TABS,
+                        key: 'top_seasonvar_tab'
+                    },
+                    { title: T('sv_mark_menu'), custom: svMarkMenu },
+                    { title: T('settings_hide_watched') + ': ' + yesNo('top_hide_watched'), toggle: 'top_hide_watched' },
+                    { title: '↻ ' + T('apply'), go: true }
+                ], function(){
+                    pushSeasonvar()
+                })
+            }
+
+            touchFilterChip(comp)
+
+            return comp
+        }
+
+        function pushSeasonvar(){
+            var tab = svTabSaved()
+
+            Lampa.Storage.set('top_seasonvar_tab', tab)
+
+            Lampa.Activity.push({
+                url: '',
+                title: T('menu_seasonvar'),
+                component: 'top_seasonvar',
+                page: 1,
+                sv_tab: tab
+            })
+        }
+
         //---------- регистрация экранов
 
         if(!Lampa.Component.get('top_screen')) Lampa.Component.add('top_screen', TopScreen)
         if(!Lampa.Component.get('top_trackers')) Lampa.Component.add('top_trackers', TrackersScreen)
+        if(!Lampa.Component.get('top_seasonvar')) Lampa.Component.add('top_seasonvar', SeasonvarScreen)
 
         //---------- меню
 
@@ -1167,6 +1707,14 @@
                 component: 'top_trackers',
                 page: 1
             })
+        })
+
+        var ico_seasonvar = '<svg viewBox="0 0 36 36" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+            '<circle cx="18" cy="18" r="11"/><path d="M18 11 v7 l5 3"/>' +
+            '</svg>'
+
+        Lampa.Menu.addButton(ico_seasonvar, T('menu_seasonvar'), function(){
+            pushSeasonvar()
         })
 
 
@@ -1368,6 +1916,96 @@
                 description: T('settings_no_cam_desc')
             }
         })
+
+        //---------- настройки: Seasonvar
+
+        Lampa.SettingsApi.addComponent({
+            component: 'seasonvar',
+            icon: ico_seasonvar,
+            name: T('sv_settings_name')
+        })
+
+        Lampa.SettingsApi.addParam({
+            component: 'seasonvar',
+            param: {
+                name: 'seasonvar_login',
+                type: 'input',
+                values: 'string',
+                default: ''
+            },
+            field: {
+                name: T('sv_login'),
+                description: T('sv_login_descr')
+            }
+        })
+
+        Lampa.SettingsApi.addParam({
+            component: 'seasonvar',
+            param: {
+                name: 'seasonvar_passw',
+                type: 'input',
+                values: 'string',
+                default: ''
+            },
+            field: {
+                name: T('sv_passw'),
+                description: T('sv_login_descr')
+            },
+            // SettingsApi рисует input открытым текстом — маскируем сами
+            onRender: function(item){
+                try{
+                    item.find('input').attr('type', 'password')
+                }
+                catch(e){}
+            }
+        })
+
+        Lampa.SettingsApi.addParam({
+            component: 'seasonvar',
+            param: {
+                name: 'seasonvar_status',
+                type: 'button'
+            },
+            field: {
+                name: T('sv_status'),
+                description: '—'
+            },
+            onRender: function(item){
+                var txt = svSk() ? T('sv_ok') : T('sv_no_session')
+
+                try{
+                    item.find('.settings-param__descr').eq(0).text(txt)
+                }
+                catch(e){}
+            },
+            onChange: function(){
+                svLogin(true, function(ok){
+                    Lampa.Noty.show(ok ? T('sv_login_ok') : T('sv_login_fail'), { style: ok ? '' : 'error', time: 5000 })
+                })
+            }
+        })
+
+        Lampa.SettingsApi.addParam({
+            component: 'seasonvar',
+            param: {
+                name: 'seasonvar_scrobble',
+                type: 'trigger',
+                default: true
+            },
+            field: {
+                name: T('sv_scrobble'),
+                description: T('sv_scrobble_descr')
+            }
+        })
+
+        //---------- Seasonvar: слушатели скроббла
+
+        Lampa.Player.listener.follow('start', svPlayerStart)
+        Lampa.Listener.follow('state:changed', svTimelineChange)
+
+        setInterval(function(){
+            if(svSk() || svField('seasonvar_login').trim()) svFlush()
+        }, 5 * 60 * 1000)
 
     }
 

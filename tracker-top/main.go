@@ -562,7 +562,7 @@ func warmCache() {
 
 func main() {
 	port := env("PORT", "8355")
-	log.Printf("tracker-top %s on :%s, nnm=%s rutor=%s ttl=%ds", rev, port, nnmBase, rutorBase, ttl)
+	log.Printf("tracker-top %s on :%s, nnm=%s rutor=%s seasonvar=%s ttl=%ds", rev, port, nnmBase, rutorBase, seasonvarBase, ttl)
 
 	loadDiskCache()
 
@@ -614,7 +614,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"ok": true, "rev": rev, "nnm": nnmBase, "rutor": rutorBase})
+		writeJSON(w, 200, map[string]any{"ok": true, "rev": rev, "nnm": nnmBase, "rutor": rutorBase, "seasonvar": seasonvarBase})
 	})
 
 	// батч-проверка наличия раздач: один запрос на страницу «Топ · TMDB».
@@ -804,7 +804,8 @@ func main() {
 		})
 	})
 
-	// есть ли у фильма раздача под наши фильтры — для «Топ · TMDB»
+	// есть ли у фильма раздача под наши фильтры — для «Топ · TMDB»;
+	// list=1 — все подходящие раздачи списком (выбор релиза сезона в «Seasonvar»)
 	mux.HandleFunc("GET /find", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		query := param(q, "query", "")
@@ -814,12 +815,23 @@ func main() {
 		}
 		year, _ := strconv.Atoi(param(q, "year", "0"))
 
+		if param(q, "list", "") == "1" {
+			items := findListWithCache2(query, param(q, "orig", ""), year, param(q, "type", "movie"),
+				param(q, "minq", ""), param(q, "voice", ""),
+				param(q, "junk", "1") != "0", param(q, "ru", "1") != "0")
+			writeJSON(w, 200, map[string]any{"found": len(items) > 0, "items": items})
+			return
+		}
+
 		it, found := findWithCache2(query, param(q, "orig", ""), year, param(q, "type", "movie"),
 			param(q, "minq", ""), param(q, "voice", ""),
 			param(q, "junk", "1") != "0", param(q, "ru", "1") != "0")
 
 		writeJSON(w, 200, map[string]any{"found": found, "item": it})
 	})
+
+	// seasonvar.ru — прокси топа «Seasonvar» (см. seasonvar.go)
+	seasonvarHandlers(mux)
 
 	mux.HandleFunc("/top", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()

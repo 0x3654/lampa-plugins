@@ -28,7 +28,7 @@
 
 ## 🏆 Top — «адекватный топ» вместо ленты
 
-Два пункта в главном меню — основной плагин.
+Три пункта в главном меню — основной плагин.
 
 ### Топ · TMDB
 
@@ -49,6 +49,27 @@
 Лист фильтров (вправо) повторяет штатный фильтр торрентов: **качество,
 озвучки, тумблеры**.
 
+### Seasonvar
+
+**Зеркало [seasonvar.ru](https://seasonvar.ru) + статусы просмотра аккаунта.**
+Четыре варианта (кнопка вправо): **Топ**, **Новинки**, **Обновления** — блоки
+главной сайта — и **Отслеживаемые** — закладки аккаунта («на чём остановились»)
+с плашками прогресса `2/8` и ✓ за целиком просмотренные сезоны. Карточки
+нативные: айтем seasonvar матчится с TMDB, клик открывает обычную страницу
+сериала — поиск раздач дальше штатный парсер Lampa.
+
+Статусы пишутся в обе стороны:
+
+- **авто-скроббл** — серия, досмотренная в Lampa на ≥90%, отмечается на
+  seasonvar.ru (мапа tmdb→seasonvar запоминается при просмотре топа);
+- **вручную** — лист фильтров (вправо) → «Отметка просмотра…»: серия N,
+  сезон целиком, «хочу смотреть», снять отметку.
+
+Учётка — в Настройки → Seasonvar (e-mail + пароль): сервер единожды логинится
+и возвращает устройству куку сессии `svid1` (живёт ~30 дней, обновляется
+кнопкой «Сессия»). Креды на сервере не хранятся; у сайта нет CORS, поэтому
+всё ходит через tracker-top `/seasonvar/*` тем же origin.
+
 ### Настройки
 
 Настройки → Топ:
@@ -65,6 +86,10 @@
 | Только на русском | скрывать раздачи/карточки совсем без русских букв в названии |
 | Скрыть аниме | «Топ · трекеры»: японские аниме прочь, мультики остаются (вкл по умолчанию) |
 | Скрывать CAM/TS | камрипы и «звук с TS» вычищаются ДО дедупа: фильм только с такими раздачами исчезает целиком, с нормальной — остаётся с ней (вкл по умолчанию) |
+
+Настройки → Seasonvar: **Логин/Пароль** (e-mail аккаунта seasonvar.ru),
+**Сессия · войти/обновить** (статус и перелогин), **Скроббл в Seasonvar**
+(тумблер, вкл по умолчанию).
 
 ## 📤 Torrent Send — отправка в торрент-клиент
 
@@ -184,6 +209,7 @@ Go-сервис экранов «Топ · трекеры» и серверно�
 ```
 GET /top?src=both|nnm|rut&cat=video|all&pages=1..3&minq=720|1080|2160&audio=all|dub|no_ts
 GET /feed?...   серверная сборка TMDB-топов с фильтрами и exclude просмотренного
+GET /seasonvar/...  прокси seasonvar.ru: login/home/tracking/serial/search/mark
 GET /healthz
 ```
 
@@ -194,9 +220,9 @@ build → scratch; сломанный парсер валит сборку; non-
 
 ## 🗺 Планы
 
-- [ ] **Синк с seasonvar.ru** — импорт отметок серий аккаунта по образцу
-  plex-sync; API недокументирован (копать грабберы/kodi-плагины),
-  вероятно понадобится прокси как `/plex/`
+- [x] **Синк с seasonvar.ru** — топ Seasonvar в Лампе (блоки главной +
+  «Отслеживаемые»), чтение и запись отметок, авто-скроббл досмотренных
+  серий (ветка `seasonvar`)
 - [ ] **Топы по рейтингу** — вариант NNM с сортировкой по рейтингу (`o=5`)
   рядом с топами по сидам/дате
 - [ ] **Фильтры типов релизов** — разрез фильтров в родном меню торрентов
@@ -376,6 +402,28 @@ Releases that don't match TMDB (software, games, packs) are not shown.
 The filter sheet (right button) mirrors the native torrent-filter UI:
 quality, up to two voices, toggles, «Show».
 
+### Seasonvar
+
+A mirror of [seasonvar.ru](https://seasonvar.ru) plus the account's watching
+statuses. Four variants (right button): **Top**, **New**, **Updates** — the
+site's main-page blocks — and **Tracked** — the account's bookmarks
+(«where you left off») with `2/8` progress plates and a ✓ for fully watched
+seasons. Cards are native: a seasonvar item is matched to TMDB, a click opens
+the regular series page — release search continues in the stock Lampa parser.
+
+Statuses flow both ways:
+
+- **auto-scrobble** — an episode finished in Lampa at ≥90% gets marked on
+  seasonvar.ru (the tmdb→seasonvar map is remembered while you browse the top);
+- **manually** — filter sheet (right button) → «Watching mark…»: episode N,
+  whole season, «want to see», remove the mark.
+
+Credentials live in Settings → Seasonvar (e-mail + password): the server logs
+in once and hands the device the `svid1` session cookie (~30 days, refreshed
+by the «Session» button). Credentials are not stored server-side; the site
+has no CORS, so everything goes through tracker-top `/seasonvar/*`,
+same origin.
+
 ### Settings
 
 Settings → Top:
@@ -392,6 +440,10 @@ Settings → Top:
 | Russian titles only | hide releases/cards with no cyrillic in the title |
 | Hide anime | Top · trackers: no Japanese anime, cartoons stay (on by default) |
 | Hide CAM/TS | camrips and TS sound are cut before dedup: a film with only such releases disappears entirely, one with a proper release stays (on by default) |
+
+Settings → Seasonvar: **Login/Password** (seasonvar.ru account e-mail),
+**Session · sign in / refresh** (status and re-login), **Scrobble to
+Seasonvar** (toggle, on by default).
 
 ## 📤 Torrent Send
 
@@ -525,9 +577,6 @@ healthcheck). A public instance serves `https://top.0x3654.com`.
 
 ## 🗺 Roadmap
 
-- **seasonvar.ru sync** — import the account's episode marks the plex-sync
-  way; the API is undocumented (digging through grabbers/Kodi plugins),
-  likely needs a proxy like `/plex/`
 - **Rating tops** — an NNM variant sorted by rating (`o=5`) next to the
   seeds/date tops
 - **Torrent release-kind filters** — a filter slice in Lampa's own
@@ -539,7 +588,9 @@ healthcheck). A public instance serves `https://top.0x3654.com`.
 - Live check of the outgoing Plex scrobble (watch ≥ 90 % in Lampa → the
   mark lands on the Plex server)
 
-Done highlights: the marks single store, the Apple TV embedded TorrServer
+Done highlights: the seasonvar.ru sync (a Seasonvar top with read/write
+watching marks and auto-scrobble, branch `seasonvar`), the marks single store,
+the Apple TV embedded TorrServer
 over http, the cub cuts on the clone (ads/analytics/censorship/Shots),
 unlocked card statuses, the Plex↔Lampa sync.
 

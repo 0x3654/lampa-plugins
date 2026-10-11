@@ -1000,7 +1000,7 @@
             try{
                 var cur = Lampa.Activity.active() || {}
 
-                if(cur.component === 'top_screen' || cur.component === 'top_trackers'){
+                if(cur.component === 'top_screen' || cur.component === 'top_trackers' || cur.component === 'top_seasonvar'){
                     Lampa.Activity.push({
                         url: cur.url || '',
                         title: cur.title,

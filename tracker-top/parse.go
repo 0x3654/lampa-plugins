@@ -522,9 +522,67 @@ func findRelease(query string, year int, typ string, minq, voices string, junk, 
 	return findRelease2(query, "", year, typ, minq, voices, junk, ru)
 }
 
-// findRelease2 — ищем и по русскому названию, и по оригиналу: NNM/rutor
-// находят разное (живой кейс: «Одиссея» пусто, «The Odyssey» — раздача с RU)
+// findRelease2 — лучшая раздача фильма под наши фильтры (год с допуском:
+// фильм ±1, сериал ±6 — у сезонных раздач год сезона, не первого)
 func findRelease2(query, orig string, year int, typ string, minq, voices string, junk, ru bool) (Item, bool) {
+	kept := findReleaseList2(query, orig, year, typ, minq, voices, junk, ru)
+	// один фильм — одна позиция (для списка релизов сезона дедуп не нужен:
+	// 1080p/720p/озвучки одного сезона должны остаться каждая)
+	kept = dedupeFilms(kept)
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].Seeders > kept[j].Seeders })
+	if len(kept) == 0 {
+		return Item{}, false
+	}
+	return kept[0], true
+}
+
+// кэш списков релизов (list=1 в /find, экран «Раздачи» сезона): in-memory,
+// на диск не пишем — списки редко нужны и быстро собираются заново
+var (
+	findListCacheMu sync.Mutex
+	findListCache   = map[string]findListCacheEntry{}
+)
+
+type findListCacheEntry struct {
+	ts    time.Time
+	items []Item
+}
+
+func findListWithCache2(query, orig string, year int, typ, minq, voices string, junk, ru bool) []Item {
+	key := cacheVer + "|list|" + query + "|" + orig + "|" + strconv.Itoa(year) + "|" + typ + "|" + minq + "|" + voices + "|" +
+		strconv.FormatBool(junk) + strconv.FormatBool(ru)
+
+	findListCacheMu.Lock()
+	if e, ok := findListCache[key]; ok {
+		live := 45 * time.Minute
+		if len(e.items) > 0 {
+			live = 12 * time.Hour
+		}
+		if time.Since(e.ts) < live {
+			findListCacheMu.Unlock()
+			return e.items
+		}
+		delete(findListCache, key)
+	}
+	findListCacheMu.Unlock()
+
+	items := findReleaseList2(query, orig, year, typ, minq, voices, junk, ru)
+
+	findListCacheMu.Lock()
+	if len(findListCache) > 1000 {
+		findListCache = map[string]findListCacheEntry{}
+	}
+	findListCache[key] = findListCacheEntry{ts: time.Now(), items: items}
+	findListCacheMu.Unlock()
+
+	return items
+}
+
+// findReleaseList2 — все подходящие раздачи: та же логика, что у одиночного
+// поиска, но без дедупа (каждое качество/озвучка сезона — отдельный пункт);
+// ищем и по русскому названию, и по оригиналу: NNM/rutor
+// находят разное (живой кейс: «Одиссея» пусто, «The Odyssey» — раздача с RU)
+func findReleaseList2(query, orig string, year int, typ string, minq, voices string, junk, ru bool) []Item {
 	tol := 1
 	if typ == "tv" {
 		tol = 6
@@ -572,14 +630,10 @@ func findRelease2(query, orig string, year int, typ string, minq, voices string,
 	if ru {
 		kept = filterRussian(kept, "1")
 	}
-	kept = dedupeFilms(kept)
 	kept = filterItems(kept, minq, "all")
 	sort.SliceStable(kept, func(i, j int) bool { return kept[i].Seeders > kept[j].Seeders })
 
-	if len(kept) == 0 {
-		return Item{}, false
-	}
-	return kept[0], true
+	return kept
 }
 
 func abs(n int) int {

@@ -31,7 +31,7 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   // /topapi ловим с самого начала: «Топ» — главная (top_as_home), /feed
   // уходит ещё на буте, до явного открытия экранов ниже
   const topapi = []
-  const onResp = r => { if (/\/topapi\/(top|feed)/.test(r.url())) topapi.push(r.status() + ' ' + r.url().replace(/^.*\/topapi/, '/topapi').slice(0, 60)) }
+  const onResp = r => { if (/\/topapi\/(top|feed|seasonvar)/.test(r.url())) topapi.push(r.status() + ' ' + r.url().replace(/^.*\/topapi/, '/topapi').slice(0, 60)) }
   page.on('response', onResp)
 
   await page.goto(PAGE, { waitUntil: 'domcontentloaded' })
@@ -113,8 +113,16 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   if (await openScreen('top_trackers')) await page.waitForTimeout(12000)
   else console.log('!! экран top_trackers не открылся')
 
-  if (await openScreen('top_screen')) await page.waitForTimeout(12000)
-  else console.log('!! экран top_screen не открылся')
+  // top_screen — с параметрами варианта, как его пушит пункт меню
+  // (push без top_method уходит в прямой TMDB — в контейнере ему нет хода)
+  try {
+    await page.evaluate(() => window.Lampa.Activity.push({ url: '', title: 'Топ · TMDB', component: 'top_screen', page: 1, top_variant: 'movie_week', top_method: 'trending/movie/week', top_params: {} }))
+    await page.waitForTimeout(12000)
+  } catch (e) { console.log('!! экран top_screen не открылся') }
+
+  // «Seasonvar»: блок главной уходит в /seasonvar/home через тот же topapi
+  if (await openScreen('top_seasonvar')) await page.waitForTimeout(12000)
+  else console.log('!! экран top_seasonvar не открылся')
 
   page.removeListener('response', onResp)
   console.log('topapi screen requests:', topapi.length ? topapi.slice(0, 6).join('\n  ') : '(none)')
@@ -147,6 +155,7 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
     && probe === 200
     && topapi.some(u => u.startsWith('200 /topapi/top'))
     && topapi.some(u => u.startsWith('200 /topapi/feed'))
+    && topapi.some(u => u.startsWith('200 /topapi/seasonvar'))
     && plexInstalled
 
   console.log(ok ? 'E2E STAND OK' : 'E2E STAND FAIL')

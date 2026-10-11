@@ -1,5 +1,6 @@
 // Смоук-тест плагина top.js: регистрация, «Топ» (TMDB+окна дат), «Топ трекеров»
-// (настройки: качество/озвучки/CAM/просмотренные), пресеты «Мой фильтр», «Топ» вместо главной
+// (настройки: качество/озвучки/CAM/просмотренные), пресеты «Мой фильтр», «Топ» вместо главной,
+// «Seasonvar» (блоки главной/отслеживаемые, ручные отметки, авто-скроббл)
 const fs = require('fs')
 const vm = require('vm')
 const assert = require('assert')
@@ -7,9 +8,11 @@ const assert = require('assert')
 const source = fs.readFileSync(__dirname + '/top.js', 'utf8')
 
 const calls = { menu: [], components: {}, params: [], push: [], replace: [], selects: [], noty: [],
-                settings: [], tmdb: [], urls: [], inputs: [] }
+                settings: [], tmdb: [], urls: [], inputs: [], svMarks: [] }
 const listeners = {}
-const state = { storage: {}, fields: {}, tmdbResponse: null, serverJson: null, findJson: null, favorite: {} }
+const intervals = []
+const state = { storage: {}, fields: {}, tmdbResponse: null, serverJson: null, findJson: null, favorite: {},
+                svHome: null, svTrack: null, svSerial: null }
 
 function InteractionCategory(object){
     this.object = object
@@ -49,6 +52,24 @@ function Reguest(){
             if(state.findBatchJson) ok(state.findBatchJson)
             else fail({})
         }
+        else if(url.includes('/seasonvar/home')) {
+            if(state.svHome) ok({ items: state.svHome })
+            else fail({})
+        }
+        else if(url.includes('/seasonvar/tracking')) {
+            if(state.svTrack) ok(state.svTrack)
+            else fail({})
+        }
+        else if(url.includes('/seasonvar/login')) {
+            ok({ ok: true, sk: 'TESTSK' })
+        }
+        else if(url.includes('/seasonvar/mark')) {
+            calls.svMarks.push(url)
+            ok({ msg: 'success' })
+        }
+        else if(url.includes('/seasonvar/serial')) {
+            ok(state.svSerial || { seasons: [] })
+        }
         else if(url.includes('/top')) {
             const m = url.match(/[&?]page=(\d+)/)
             const pg = m ? +m[1] : 0
@@ -81,6 +102,7 @@ const sandbox = {
     // setTimeout мгновенный: плашки вешаются отложенно (экран монтируется
     // после append) — в песочке колбэки срабатывают сразу, тайминги ловит e2e
     setTimeout(fn){ try{ fn() }catch(e){} return 0 },
+    setInterval(fn){ intervals.push(fn); return 0 },
     navigator: {},
     location: { origin: 'http://localhost:8098' }, // как дев-стенд (TJS_DEV)
     document: {
@@ -130,6 +152,11 @@ sandbox.Lampa = {
         get(params){ return state.favorite[params.type] || [] }
     },
     Controller: { toggle(){} },
+    Player: {
+        listener: {
+            follow(type, fn){ (listeners['player:' + type] = listeners['player:' + type] || []).push(fn) }
+        }
+    },
     Reguest,
     InteractionCategory,
     Api: {
@@ -151,16 +178,17 @@ vm.runInContext(source, sandbox)
 const fire = (type, e) => (listeners[type] || []).forEach(fn => fn(e))
 
 // --- 1. регистрация + формат параметров (input обязан иметь values:'string')
-assert.ok(calls.components['top_screen'] && calls.components['top_trackers'])
-assert.strictEqual(calls.menu.length, 2)
+assert.ok(calls.components['top_screen'] && calls.components['top_trackers'] && calls.components['top_seasonvar'])
+assert.strictEqual(calls.menu.length, 3)
 assert.deepStrictEqual(calls.params.map(p => p.param.name),
-    ['top_server_url', 'top_as_home', 'top_min_quality', 'top_voice_1', 'top_voice_2', 'top_hide_watched', 'top_trackers_only', 'top_hide_series', 'top_ru_titles', 'top_hide_anime', 'top_no_cam'])
+    ['top_server_url', 'top_as_home', 'top_min_quality', 'top_voice_1', 'top_voice_2', 'top_hide_watched', 'top_trackers_only', 'top_hide_series', 'top_ru_titles', 'top_hide_anime', 'top_no_cam', 'seasonvar_login', 'seasonvar_passw', 'seasonvar_status', 'seasonvar_scrobble'])
 assert.strictEqual(calls.params[0].param.values, 'string', 'input обязан иметь values:string (иначе краш настроек Lampa)')
+assert.strictEqual(calls.params[11].param.values, 'string', 'seasonvar_login — тоже input: values:string обязателен')
 {
     const sel = calls.params[2].param.values
     assert.strictEqual(Object.keys(sel).sort().join(','), '1080,2160,720,any', 'select — объект ключ→название')
 }
-console.log('✓ регистрация: 2 экрана, 2 пункта меню (Топ · TMDB, Топ · трекеры), параметры с маркером input')
+console.log('✓ регистрация: 3 экрана, 3 пункта меню (Топ · TMDB, Топ · трекеры, Seasonvar), параметры с маркером input')
 
 // --- 2. варианты с окном дат: 14 дней подставляет primary_release_date.gte
 {
@@ -512,7 +540,7 @@ console.log('✓ «скрыть просмотренные»: 4 источник
 // --- 8. «Топ» вместо главной (отдельный контекст с включённым тумблером)
 {
     const calls2 = { replace: [] }
-    const sb = { console, navigator: {}, document: { createElement: () => ({}) }, setTimeout(){}, window: null }
+    const sb = { console, navigator: {}, document: { createElement: () => ({}) }, setTimeout(){}, setInterval(){}, window: null }
     sb.window = sb
     sb.appready = true
     sb.Lampa = {
@@ -522,6 +550,8 @@ console.log('✓ «скрыть просмотренные»: 4 источник
         Component: { add(){}, get(){ return null } },
         Menu: { addButton(){} },
         SettingsApi: { addComponent(){}, addParam(){} },
+        Player: { listener: { follow(){} } },
+        Reguest: function(){ this.timeout = () => {}; this.silent = () => {} },
         Storage: {
             field(name){ return name === 'top_as_home' ? 'true' : undefined },
             get(key, def){ return key === 'top_last_variant' ? '3' : def }, // tv_week в новой таблице
@@ -543,5 +573,145 @@ comp.create()
 assert.ok(calls.noty.some(n => n.text === 'top_need_server'))
 assert.strictEqual(calls.settings[0], 'top')
 console.log('✓ без адреса сервера: подсказка и экран настроек')
+
+// --- 10. Seasonvar: блоки главной, отслеживаемые, ручные отметки, авто-скроббл
+state.fields.top_server_url = 'http://localhost:8098/topapi'
+state.fields.top_hide_watched = 'false'
+state.favorite = { history: [] }
+
+// 10a. кнопка меню пушит экран с последним вариантом
+calls.menu[2].cb()
+assert.strictEqual(calls.push[calls.push.length - 1].component, 'top_seasonvar')
+assert.strictEqual(calls.push[calls.push.length - 1].sv_tab, 'pop')
+console.log('✓ Seasonvar: пункт меню пушит экран')
+
+// 10a2. пароль в настройках маскируется (input → type=password)
+{
+    const passw = calls.params.find(p => p.param.name === 'seasonvar_passw')
+    assert.ok(passw.onRender, 'у пароля есть onRender-маскировка')
+    let masked = null
+    passw.onRender({ find: () => ({ attr: (k, v) => { if (k === 'type') masked = v } }) })
+    assert.strictEqual(masked, 'password', 'input пароля получает type=password')
+}
+console.log('✓ Seasonvar: пароль в настройках скрыт (**********)')
+
+// 10b. блок главной: айтем seasonvar → TMDB-карточка + бейдж сезона + карта скроббла
+state.svHome = [
+    { id: 49673, path: '/serial-49673-Gangsterlend-2-season.html', ru: 'Гангстерленд', orig: 'MobLand', year: 2026, season: 2, info: 'Сезон 2 4 серия' }
+]
+state.tmdbResponse = { results: [
+    { id: 247718, name: 'Гангстерленд', original_name: 'MobLand', first_air_date: '2025-03-30', popularity: 42 },
+    { id: 111222, name: 'Чужой сериал', first_air_date: '2019-01-01', popularity: 90 },
+    { id: 333, name: 'Ронин', first_air_date: '1998-09-19', popularity: 99 } // фильм — не должен сматчиться
+] }
+let svComp = new calls.components['top_seasonvar']({ page: 1, sv_tab: 'pop' })
+{
+    const before = calls.tmdb.length
+    svComp.create()
+    assert.strictEqual(calls.tmdb[calls.tmdb.length - 1].method, 'search/tv', 'seasonvar матчится только по tv, не multi')
+    assert.strictEqual(calls.tmdb.length, before + 1, 'один запрос матчинга на айтем')
+}
+assert.deepStrictEqual(svComp.built.map(r => r.id), [247718], 'сезонвар-айтем сматчен с TMDB (MobLand, не популярный чужой)')
+assert.strictEqual(svComp.built[0].sv.id, 49673, 'исходный seasonvar-айтем приехал на карточке')
+assert.ok(calls.urls.some(u => u.includes('/seasonvar/home?mode=pop')), 'запрос блока главной')
+{
+    const view = svComp.topDomCards()[0].querySelector('.card__view')
+    const vb = view.children.find(c => (c.className || '').includes('top-badge--voice'))
+    assert.ok(vb && vb.textContent === 'S2', 'бейдж номера сезона: ' + (vb && vb.textContent))
+    const map = state.storage.seasonvar_map || {}
+    assert.ok(map['247718'] && map['247718'].sid === 49673, 'карта tmdb→seasonvar запомнена для скроббла')
+}
+console.log('✓ Seasonvar: блок главной, матчинг TMDB, карта скроббла')
+
+// 10c. «Отслеживаемые»: сессия из Storage, прогресс «1/8», ✓ за целиком просмотренный
+state.storage.seasonvar_sk = 'TESTSK'
+state.svTrack = {
+    ok: true, uid: 2365606,
+    tabs: {
+        new:   [{ id: 49803, path: '/serial-49803-Kerri.html', ru: 'Кэрри', watched: 1, total: 8, last: '1 серия от LostFilm' }],
+        nonew: [{ id: 49673, path: '/serial-49673-Gangsterlend-2-season.html', ru: 'Гангстерленд', watched: 8, total: 8 }]
+    }
+}
+state.tmdbResponse = { results: [
+    { id: 247718, name: 'Гангстерленд', first_air_date: '2025-03-30', media_type: 'tv', popularity: 42 },
+    { id: 250019, name: 'Кэрри', first_air_date: '2026-10-11', media_type: 'tv', popularity: 20 }
+] }
+svComp = new calls.components['top_seasonvar']({ page: 1, sv_tab: 'tracking' })
+svComp.create()
+assert.strictEqual(svComp.built.length, 2, 'вкладки «с обновлениями» и «без» склеены')
+assert.ok(calls.urls.some(u => u.includes('/seasonvar/tracking?sk=TESTSK')), 'отслеживаемые тянутся с сессией')
+{
+    const first = svComp.built.find(r => r.sv.id === 49803)
+    const view = svComp.topDomCards()[svComp.built.indexOf(first)].querySelector('.card__view')
+    const vb = view.children.find(c => (c.className || '').includes('top-badge--voice'))
+    assert.ok(vb && vb.textContent === '1/8', 'плашка прогресса сезона: ' + (vb && vb.textContent))
+    const done = svComp.built.find(r => r.sv.id === 49673)
+    const dv = svComp.topDomCards()[svComp.built.indexOf(done)].querySelector('.card__view')
+    assert.ok(dv.children.some(c => (c.className || '').includes('top-badge--watched')), 'целиком просмотренный сезон — ✓')
+}
+console.log('✓ Seasonvar: «Отслеживаемые» — прогресс, ✓, обе вкладки')
+
+// 10d. мёртвая сессия: сервер сказал ok=false — подсказка, экран пустой
+state.svTrack = { ok: false, uid: 0, tabs: {} }
+svComp = new calls.components['top_seasonvar']({ page: 1, sv_tab: 'tracking' })
+svComp.create()
+assert.ok(calls.noty.some(n => n.text === 'top_sv_session_dead'), 'подсказка о сессии')
+assert.ok(svComp.emptied, 'экран пустой')
+state.svTrack = null
+console.log('✓ Seasonvar: мёртвая сессия распознана')
+
+// 10e. ручная отметка: лист фильтров → сериал → действие → серия
+state.svHome = [
+    { id: 49673, path: '/serial-49673-Gangsterlend-2-season.html', ru: 'Гангстерленд', orig: 'MobLand', season: 2 }
+]
+state.tmdbResponse = { results: [ { id: 247718, name: 'Гангстерленд', first_air_date: '2025-03-30', media_type: 'tv', popularity: 42 } ] }
+svComp = new calls.components['top_seasonvar']({ page: 1, sv_tab: 'pop' })
+svComp.create()
+svComp.onRight() // лист фильтров
+{
+    const sheet = calls.selects[calls.selects.length - 1]
+    const markRow = sheet.items.find(i => i.custom)
+    assert.ok(markRow, 'в листе есть ряд ручных отметок')
+    markRow.custom() // выбор сериала
+    const pick = calls.selects[calls.selects.length - 1]
+    pick.onSelect(pick.items[0]) // Гангстерленд
+    const actions = calls.selects[calls.selects.length - 1]
+    actions.onSelect(actions.items.find(a => a.action === 'pause')) // «отметить серию…»
+    const eps = calls.selects[calls.selects.length - 1]
+    eps.onSelect(eps.items[3]) // 4 серия
+    const mark = calls.svMarks[calls.svMarks.length - 1]
+    assert.ok(mark.includes('mode=pause') && mark.includes('id=49673') && mark.includes('seria=4') && mark.includes('sk=TESTSK'),
+        'отметка ушла на нужный сезон/серию с сессией: ' + mark)
+}
+console.log('✓ Seasonvar: ручная отметка «серия 4» через лист')
+
+// 10f. авто-скроббл: старт плеера + таймлайн ≥90% → флеш интервалом → отметка
+fire('player:start', {
+    card: { id: 34015, name: 'Гангстерленд' },
+    movie: { season_number: 2, episode_number: 4, show_id: 247718 },
+    timeline: { hash: 'H1' }
+})
+fire('state:changed', { target: 'timeline', reason: 'update', data: { hash: 'H1', road: { percent: 95, time: 2700, duration: 2820 } } })
+{
+    const out = state.storage.seasonvar_out || {}
+    assert.ok(out.H1 && out.H1.percent === 95 && out.H1.episode === 4, 'эпизод попал в очередь скроббла')
+}
+// фильм отметками seasonvar не трогаем
+fire('player:start', { card: { id: 777, title: 'Фильм' }, timeline: { hash: 'H2' } })
+fire('state:changed', { target: 'timeline', reason: 'update', data: { hash: 'H2', road: { percent: 100, time: 100, duration: 100 } } })
+assert.ok(!(state.storage.seasonvar_out || {}).H2, 'фильмы в очередь не попадают')
+// кэш сезонов: S2 = 49673, флеш по интервалу
+state.storage.seasonvar_seasons = { '49673': { list: [
+    { id: 43504, path: '/serial-43504-Gangsterlend_psardux.html', season: 1 },
+    { id: 49673, path: '/serial-49673-Gangsterlend-2-season.html', season: 2, current: true }
+], ts: Date.now() } }
+assert.ok(intervals.length >= 1, 'интервал флеша зарегистрирован')
+intervals[intervals.length - 1]()
+{
+    const mark = calls.svMarks[calls.svMarks.length - 1]
+    assert.ok(mark.includes('id=49673') && mark.includes('seria=4'), 'скроббл отметил S2E4 на seasonvar-сезоне: ' + mark)
+    assert.ok((state.storage.seasonvar_scrobbled || {}).H1, 'скроббл зафиксирован — повторов не будет')
+}
+console.log('✓ Seasonvar: авто-скроббл S2E4 (карта tmdb→seasonvar + кэш сезонов)')
 
 console.log('\nВСЕ СМОУК-ТЕСТЫ ПРОЙДЕНЫ')
