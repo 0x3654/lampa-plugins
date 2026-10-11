@@ -8,6 +8,7 @@
 package main
 
 import (
+	"net"
 	"encoding/json"
 	"errors"
 	"io"
@@ -673,6 +674,50 @@ func main() {
 
 	mux.HandleFunc("GET /findbatch", findbatch)
 	mux.HandleFunc("POST /findbatch", findbatch)
+
+	// /geo — страна клиента по его реальному IP (X-Real-IP от nginx,
+	// fallback — адрес соединения): наш替代 geo-детекта cub, чтобы лампа
+	// не ходила за регионом на их зеркала; CORS открыт для лампы
+	mux.HandleFunc("GET /geo", func(w http.ResponseWriter, r *http.Request) {
+		ip := r.Header.Get("X-Real-IP")
+		if ip == "" {
+			if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+				ip = host
+			} else {
+				ip = r.RemoteAddr
+			}
+		}
+		if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+			writeJSON(w, 200, map[string]any{"country": "ge", "ip": ip})
+			return
+		}
+
+		url := "http://ip-api.com/json/" + ip + "?fields=status,countryCode"
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			http.Error(w, "geo: "+err.Error(), 500)
+			return
+		}
+		req.Header.Set("User-Agent", userAgent)
+
+		resp, err := (&http.Client{Timeout: 8 * time.Second}).Do(req)
+		if err != nil {
+			writeJSON(w, 200, map[string]any{"country": "", "error": err.Error()})
+			return
+		}
+		defer resp.Body.Close()
+
+		var body struct {
+			Status      string `json:"status"`
+			CountryCode string `json:"countryCode"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil || body.Status != "success" {
+			writeJSON(w, 200, map[string]any{"country": ""})
+			return
+		}
+
+		writeJSON(w, 200, map[string]any{"country": strings.ToLower(body.CountryCode)})
+	})
 
 	// страница «Топ · TMDB» целиком: список + фильтры раздач + качество
 	mux.HandleFunc("GET /feed", func(w http.ResponseWriter, r *http.Request) {
