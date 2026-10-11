@@ -453,8 +453,15 @@
 
                 var exclude = watchedIdsParam()
 
+                // лента без ЛГБТ: тумблер лампы «Блокировать ЛГБТ контент» —
+                // если смотреть нельзя, то и в ленте не показывать вовсе
+                var nolgbt = ''
+                try{
+                    if(String(Lampa.Storage.field('lgbt_content_block')) === 'true') nolgbt = '&nolgbt=1'
+                }catch(e){}
+
                 net.silent(base + '/feed?variant=' + (object.top_variant || 'movie_week') +
-                    '&page=' + page + '&slice=100' + filtersParams() +
+                    '&page=' + page + '&slice=100' + filtersParams() + nolgbt +
                     (exclude ? '&exclude=' + exclude : ''), function(json){
                     if(!json || !json.results){
                         fail(json)

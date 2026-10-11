@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-const cacheVer = "v13" // версия логики фильтров: смена инвалидирует кэш на томе
+const cacheVer = "v14" // версия логики фильтров: смена инвалидирует кэш на томе
 
 var (
 	nnmBase   = env("NNM_BASE", "https://nnmclub.to")
@@ -698,13 +698,14 @@ func main() {
 
 		// пул 100 фильмов (обновляется 2 раза в день): страница с любым
 		// exclude юзера нарезается мгновенно; фолбэк — прямая сборка
+		nolgbt := param(q, "nolgbt", "0") == "1"
 		results, total, err := poolPage(variant, page, feedSize, exclude,
-			param(q, "minq", ""), param(q, "voice", ""))
+			param(q, "minq", ""), param(q, "voice", ""), nolgbt)
 		if errors.Is(err, errPoolBuilding) {
 			// пул собирается прогревом — сырая страница TMDB мгновенно,
 			// качество/озвучка появятся следующим открытием
 			if raw, tot, rerr := rawTMDBPage(variant, page, feedSize, exclude,
-				param(q, "minq", ""), param(q, "voice", "")); rerr == nil {
+				param(q, "minq", ""), param(q, "voice", ""), nolgbt); rerr == nil {
 				writeJSON(w, 200, map[string]any{
 					"page": page, "total_pages": tot, "results": raw, "building": true,
 				})

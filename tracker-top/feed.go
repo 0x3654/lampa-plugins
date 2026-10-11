@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -556,7 +557,7 @@ func buildPool(variant string) ([]map[string]any, error) {
 // реальные раздачи с плашками; фейки невышедших фильмов и прочее
 // нематченное не показывается вовсе. База недоступна — сырая страница
 // как раньше (лучше без плашек, чем пустой экран)
-func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string) ([]map[string]any, int, error) {
+func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt bool) ([]map[string]any, int, error) {
 	v, ok := tmdbVariants[variant]
 	if !ok {
 		return nil, 0, fmt.Errorf("unknown variant")
@@ -585,6 +586,14 @@ func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq,
 			}
 			if idf, ok := el["id"].(float64); ok {
 				if seen[idf] || (exclude != nil && exclude[int(idf)]) {
+					continue
+				}
+			}
+
+			// лента без ЛГБТ (тумблер лампы): карточку с лгбт-ключами
+			// TMDB не показываем вовсе — не только запрет просмотра
+			if nolgbt {
+				if idf, ok := el["id"].(float64); ok && isLGBTCard(cardType(el), int(idf)) {
 					continue
 				}
 			}
@@ -640,7 +649,7 @@ func minQualityRank(minq string) int {
 // (minq/озвучки): пул собирается без озвучечных фильтров юзера, поэтому
 // они применяются при нарезке — иначе SD и без-озвучковые карточки
 // протекают в отфильтрованный топ
-func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string) ([]map[string]any, int, error) {
+func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt bool) ([]map[string]any, int, error) {
 	all, err := getPool(variant)
 	if err != nil {
 		return nil, 0, err
@@ -649,6 +658,9 @@ func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, vo
 	filtered := make([]map[string]any, 0, len(all))
 	for _, el := range all {
 		if idf, ok := el["id"].(float64); ok && exclude != nil && exclude[int(idf)] {
+			continue
+		}
+		if nolgbt && isLGBTCard(cardType(el), int(el["id"].(float64))) {
 			continue
 		}
 		if !plateUnderFilters(el, minq, voices) {
@@ -668,4 +680,76 @@ func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, vo
 	}
 
 	return filtered[lo:hi], total, nil
+}
+
+// cardType — movie/tv по форме карточки (как cardFields, но только тип)
+func cardType(el map[string]any) string {
+	if _, has := el["name"]; has {
+		return "tv"
+	}
+	return "movie"
+}
+
+// isLGBTCard — у карточки есть лгбт-ключи TMDB (keywords /movie|tv/{id}).
+// Ответы кэшируются на процесс: пул живёт 12ч, lookup каждой карточки
+// происходит один раз; необследованные карточки НЕ блокируются (фильтр
+// включён явным тумблером юзера — ложных срабатываний меньше вреда,
+// чем дыра в ленте на время холодного кэша)
+var (
+	lgbtMu    sync.Mutex
+	lgbtKnown = map[string]bool{} // "movie:123" → есть лгбт-ключи
+)
+
+var lgbtWord = regexp.MustCompile(`(?i)lgbt|gay|lesbian|queer|transgen|homosex|homosexual|bisex|intersex|transvest|boys love|boys' love`)
+
+func isLGBTCard(typ string, id int) bool {
+	key := typ + ":" + strconv.Itoa(id)
+
+	lgbtMu.Lock()
+	if v, ok := lgbtKnown[key]; ok {
+		lgbtMu.Unlock()
+		return v
+	}
+	lgbtMu.Unlock()
+
+	url := fmt.Sprintf("%s%s/%d/keywords?api_key=%s&language=ru", tmdbAPI, typ, id, tmdbKey)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return false // сеть подвисла — не блокируем, попробуем в след. раз
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		lgbtMu.Lock()
+		lgbtKnown[key] = false
+		lgbtMu.Unlock()
+		return false
+	}
+
+	var body struct {
+		Keywords []struct {
+			Name string `json:"name"`
+		} `json:"keywords"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return false
+	}
+
+	hit := false
+	for _, k := range body.Keywords {
+		if lgbtWord.MatchString(k.Name) {
+			hit = true
+			break
+		}
+	}
+
+	lgbtMu.Lock()
+	lgbtKnown[key] = hit
+	lgbtMu.Unlock()
+	return hit
 }
