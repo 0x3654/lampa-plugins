@@ -585,15 +585,35 @@ assert.strictEqual(calls.push[calls.push.length - 1].component, 'top_seasonvar')
 assert.strictEqual(calls.push[calls.push.length - 1].sv_tab, 'pop')
 console.log('✓ Seasonvar: пункт меню пушит экран')
 
-// 10a2. пароль в настройках маскируется (input → type=password)
+// 10a2. пароль в настройках: реальный пароль живёт в seasonvar_pw,
+// параметр-пустышка — только заглушка-точки, значение ввода НЕ подставляется
 {
     const passw = calls.params.find(p => p.param.name === 'seasonvar_passw')
     assert.ok(passw.onRender, 'у пароля есть onRender-маскировка')
-    let masked = null
-    passw.onRender({ find: () => ({ attr: (k, v) => { if (k === 'type') masked = v } }) })
-    assert.strictEqual(masked, 'password', 'input пароля получает type=password')
+
+    let shown = null
+    const mkRow = () => ({ find: () => ({ eq: () => ({ text: (v) => { shown = v } }) }) })
+
+    state.storage.seasonvar_pw = 'secret1'
+    passw.onRender(mkRow())
+    assert.strictEqual(shown, '••••••••', 'пароль заполнен — заглушка, не значение')
+
+    delete state.storage.seasonvar_pw
+    shown = 'не тронуто'
+    passw.onRender(mkRow())
+    assert.strictEqual(shown, '', 'пароль пуст — пусто, без точек')
+
+    // onChange: непустой ввод перекладывается в seasonvar_pw и затирает пустышку;
+    // пустой ввод пароль не меняет
+    passw.onChange('newpass')
+    assert.strictEqual(state.storage.seasonvar_pw, 'newpass', 'ввод перекладывается в закрытый ключ')
+    assert.strictEqual(state.storage.seasonvar_passw, '', 'ключ параметра всегда пуст — значение не видно при вводе')
+
+    state.storage.seasonvar_pw = 'keepme'
+    passw.onChange('')
+    assert.strictEqual(state.storage.seasonvar_pw, 'keepme', 'пустой ввод не затирает пароль')
 }
-console.log('✓ Seasonvar: пароль в настройках скрыт (**********)')
+console.log('✓ Seasonvar: пароль никогда не выводится (заглушка •••••••• / пусто, вью нет)')
 
 // 10b. блок главной: айтем seasonvar → TMDB-карточка + бейдж сезона + карта скроббла
 state.svHome = [

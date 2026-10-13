@@ -583,7 +583,10 @@ func findListWithCache2(query, orig string, year int, typ, minq, voices string, 
 // ищем и по русскому названию, и по оригиналу: NNM/rutor
 // находят разное (живой кейс: «Одиссея» пусто, «The Odyssey» — раздача с RU)
 func findReleaseList2(query, orig string, year int, typ string, minq, voices string, junk, ru bool) []Item {
-	tol := 1
+	// фильм — год СТРОГО: допуск ±1 ловил чужой фильм с тем же названием
+	// (Union County 2026 получил плашку по раздаче Union County другого
+	// года); сериалам ±6 остаётся — у сезонных раздач год сезона
+	tol := 0
 	if typ == "tv" {
 		tol = 6
 	}

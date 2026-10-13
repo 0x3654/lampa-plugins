@@ -1245,7 +1245,7 @@
         // сервер их не хранит, только единожды логинится за нас
         function svLogin(force, cb){
             var login = svField('seasonvar_login').trim()
-            var passw = svField('seasonvar_passw')
+            var passw = svField('seasonvar_pw')
 
             if(!login || !passw) return cb(false)
 
@@ -1939,24 +1939,46 @@
             }
         })
 
+        // пароль живёт в закрытом ключе seasonvar_pw; параметр меню —
+        // пустая пустышка: SettingsApi при открытии ввода подставляет
+        // текущее значение ключа, посему реальный пароль в нём не живёт
+        // (никогда не виден, «вью» нет вовсе). Непустой ввод — новый
+        // пароль, пустой — не затирает; отображение — только заглушка
+        var svPassRow = null
+
+        function svMaskPass(){
+            if(!svPassRow) return
+
+            try{
+                var filled = String(Lampa.Storage.field('seasonvar_pw') || '')
+
+                svPassRow.find('.settings-param__value').eq(0).text(filled ? '••••••••' : '')
+            }
+            catch(e){}
+        }
+
         Lampa.SettingsApi.addParam({
             component: 'seasonvar',
             param: {
                 name: 'seasonvar_passw',
                 type: 'input',
                 values: 'string',
-                default: ''
+                default: '',
+                placeholder: '••••'
             },
             field: {
                 name: T('sv_passw'),
                 description: T('sv_login_descr')
             },
-            // SettingsApi рисует input открытым текстом — маскируем сами
             onRender: function(item){
-                try{
-                    item.find('input').attr('type', 'password')
-                }
-                catch(e){}
+                svPassRow = item
+                svMaskPass()
+            },
+            onChange: function(v){
+                if(v) Lampa.Storage.set('seasonvar_pw', v)
+
+                Lampa.Storage.set('seasonvar_passw', '')
+                svMaskPass()
             }
         })
 

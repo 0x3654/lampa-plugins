@@ -557,7 +557,7 @@ func buildPool(variant string) ([]map[string]any, error) {
 // реальные раздачи с плашками; фейки невышедших фильмов и прочее
 // нематченное не показывается вовсе. База недоступна — сырая страница
 // как раньше (лучше без плашек, чем пустой экран)
-func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt bool) ([]map[string]any, int, error) {
+func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt, ru bool) ([]map[string]any, int, error) {
 	v, ok := tmdbVariants[variant]
 	if !ok {
 		return nil, 0, fmt.Errorf("unknown variant")
@@ -594,6 +594,17 @@ func rawTMDBPage(variant string, page, feedSize int, exclude map[int]bool, minq,
 			// TMDB не показываем вовсе — не только запрет просмотра
 			if nolgbt {
 				if idf, ok := el["id"].(float64); ok && isLGBTCard(cardType(el), int(idf)) {
+					continue
+				}
+			}
+
+			// «Только на русском» — и на building-странице тоже
+			if ru {
+				name, _ := el["title"].(string)
+				if name == "" {
+					name, _ = el["name"].(string)
+				}
+				if !hasCyr(name) {
 					continue
 				}
 			}
@@ -649,7 +660,7 @@ func minQualityRank(minq string) int {
 // (minq/озвучки): пул собирается без озвучечных фильтров юзера, поэтому
 // они применяются при нарезке — иначе SD и без-озвучковые карточки
 // протекают в отфильтрованный топ
-func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt bool) ([]map[string]any, int, error) {
+func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, voices string, nolgbt, ru bool) ([]map[string]any, int, error) {
 	all, err := getPool(variant)
 	if err != nil {
 		return nil, 0, err
@@ -659,6 +670,19 @@ func poolPage(variant string, page, feedSize int, exclude map[int]bool, minq, vo
 	for _, el := range all {
 		if idf, ok := el["id"].(float64); ok && exclude != nil && exclude[int(idf)] {
 			continue
+		}
+		// «Только на русском»: карточка без кириллицы в названии (у TMDB
+		// нет русской локализации) в ленту не попадает — как в старой
+		// сборке buildFeed; в пулы фильтр не переехал и пропускал
+		// фильмы-призраки без русской локализации (Union County)
+		if ru {
+			name, _ := el["title"].(string)
+			if name == "" {
+				name, _ = el["name"].(string)
+			}
+			if !hasCyr(name) {
+				continue
+			}
 		}
 		if nolgbt && isLGBTCard(cardType(el), int(el["id"].(float64))) {
 			continue
@@ -752,4 +776,14 @@ func isLGBTCard(typ string, id int) bool {
 	lgbtKnown[key] = hit
 	lgbtMu.Unlock()
 	return hit
+}
+
+// hasCyr — есть ли кириллица в строке (фильтр «Только на русском»)
+func hasCyr(s string) bool {
+	for _, r := range s {
+		if (r >= 0x0410 && r <= 0x044F) || r == 0x0401 || r == 0x0451 {
+			return true
+		}
+	}
+	return false
 }

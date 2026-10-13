@@ -193,13 +193,20 @@
         // сами (onRender при каждом открытии раздела, onChange после ввода)
         var passRow = null
 
+        // пароль живёт в закрытом ключе nnm_pw; параметр меню nnm_password —
+        // ВСЕГДА пустая пустышка: SettingsApi при открытии ввода подставляет
+        // текущее значение ключа — держать там реальный пароль нельзя (его
+        // видно в поле). Ввод непустого значения перекладывается в nnm_pw,
+        // пустой ввод пароль не затирает. Отображение — только заглушка
+        var PW_KEY = 'nnm_pw'
+
         function maskPass(){
             if(!passRow) return
 
-            var v   = String(Lampa.Storage.field('nnm_password') || '')
+            var v   = String(Lampa.Storage.field(PW_KEY) || '')
             var val = passRow.find('.settings-param__value').eq(0)
 
-            if(v) val.text(new Array(Math.min(v.length, 16) + 1).join('•'))
+            val.text(v ? '••••••••' : '')
         }
 
         // onRender свежие бандлы глотают — дожимаем маску при открытии
@@ -236,7 +243,11 @@
                 passRow = item
                 maskPass()
             },
-            onChange: function(){
+            onChange: function(v){
+                // непустой ввод — новый пароль; пустой — не трогаем
+                if(v) Lampa.Storage.set(PW_KEY, v)
+
+                Lampa.Storage.set('nnm_password', '')
                 maskPass()
             }
         })
@@ -270,7 +281,7 @@
         function creds(){
             return {
                 login:    field('nnm_login'),
-                password: String(Lampa.Storage.field('nnm_password') || '')
+                password: String(Lampa.Storage.field('nnm_pw') || '')
             }
         }
 

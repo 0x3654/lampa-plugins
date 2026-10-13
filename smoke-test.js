@@ -151,14 +151,21 @@ function fakeRow(){
 }
 {
     store.nnm_server = 'https://nnm.0x3654.com'
-    store.nnm_password = 'pass1234'
+    store.nnm_pw = 'pass1234'
     const row = fakeRow()
     settingsParams[2].onRender(row)
     assert.strictEqual(row.val._t, '••••••••', 'значение замаскировано')
-    row.val._t = 'pass1234'
-    settingsParams[2].onChange()
+
+    // непустой ввод перекладывается в закрытый nnm_pw, ключ параметра пуст
+    settingsParams[2].onChange('newpass')
+    assert.strictEqual(store.nnm_pw, 'newpass', 'ввод перекладывается в закрытый ключ')
+    assert.strictEqual(store.nnm_password, '', 'ключ параметра всегда пуст — при вводе не видно значения')
+
+    // пустой ввод пароль не затирает
+    settingsParams[2].onChange('')
+    assert.strictEqual(store.nnm_pw, 'newpass', 'пустой ввод не затирает пароль')
     assert.strictEqual(row.val._t, '••••••••', 'после ввода снова замаскировано')
-    console.log('✓ пароль скрыт точками (при открытии и после ввода)')
+    console.log('✓ пароль никогда не выводится (заглушка ••••••••, пустой ввод не затирает)')
 }
 
 // --- 10. «Проверить вход»: подсказка без кредов, ok зелёным, 401 красным
@@ -191,7 +198,7 @@ function fakeRow(){
 calls.requests.length = 0
 calls.noty.length = 0
 delete store.nnm_login
-delete store.nnm_password
+delete store.nnm_pw
 menu = []
 fire('torrent', { type:'onlong', menu, element: { MagnetUri: 'magnet:?xt=urn:btih:' + 'ab'.repeat(20), Title: 'Movie 2026' } })
 menu[2].onSelect()
@@ -204,7 +211,7 @@ calls.requests.length = 0
 calls.noty.length = 0
 Object.keys(store).forEach(k => { if(k.indexOf('nnm_auto_token') === 0) delete store[k] })
 store.nnm_login = 'tester'
-store.nnm_password = 'pass1234'
+store.nnm_pw = "pass1234"
 menu = []
 fire('torrent', { type:'onlong', menu, element: { MagnetUri: 'magnet:?xt=urn:btih:' + 'ab'.repeat(20) + '&tr=udp://x', Title: 'Movie 2026', Tracker: 'nnm-club', Size: 7730941132 } })
 menu[2].onSelect()
