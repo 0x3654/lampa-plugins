@@ -157,11 +157,16 @@
             start_page: 'last',   // стартовая страница — последняя
             screensaver: 'false', // заставка при бездействии — нет
 
-            // парсер: публичный Jackett-прокси cub (jac.red, ключ «1»)
+            // парсер: основной — публичный прокси jac.red (ключ «1»; режет
+            // датацентровые IP — на резидентных работает), дополнительный —
+            // свой JacRed на ae2 (https://jacred.0x3654.com); режим «оба»
             parser_use: 'true',
             parser_torrent_type: 'jackett',
             jackett_url: 'jac.red',
-            jackett_key: '1'
+            jackett_key: '1',
+            jackett_url_two: 'jacred.0x3654.com',
+            jackett_key_two: '929824c2fa0ec045be993b6da1538155',
+            parser_use_link: 'both'
         },
 
         // главное меню: скрыть всё, кроме Главная и Избранного

@@ -53,6 +53,14 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
       torrserver_url: get('torrserver_url'),
       protocol: get('protocol'),
       menu_hidden: (get('menu_hide') || []).length,
+      parser: {
+        use: get('parser_use'),
+        type: get('parser_torrent_type'),
+        url: get('jackett_url'),
+        url_two: get('jackett_url_two'),
+        key_two: get('jackett_key_two'),
+        use_link: get('parser_use_link'),
+      },
       plugins: (get('plugins') || []).map(p => (p.url || '').split('/').pop()),
     }
   })
@@ -136,6 +144,22 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   })
   console.log('probe /topapi/healthz:', probe)
 
+  // второй парсер: живой кросс-оригин поиск через наш jacred из контекста
+  // страницы (как это делает лампа) — CORS + apikey + результаты
+  const parserProbe = await page.evaluate(async () => {
+    const raw = k => { const v = localStorage.getItem(k); if (v === null) return ''; try { return JSON.parse(v) } catch (e) { return v } }
+    const key = raw('jackett_key_two')
+    const host = raw('jackett_url_two')
+    if (!key || !host) return 'NO CONFIG'
+    try {
+      const r = await fetch('https://' + host + '/api/v2.0/indexers/all/results?apikey=' + key + '&Query=' + encodeURIComponent('матрица'))
+      if (r.status !== 200) return 'HTTP ' + r.status
+      const d = await r.json()
+      return (d.Results || []).length + ' results'
+    } catch (e) { return 'FAILED ' + e.message }
+  })
+  console.log('probe jacred parser (cross-origin):', parserProbe)
+
   if (failed.length) console.log('failed requests:\n' + failed.join('\n'))
 
   // plex-sync ставится бутстрапом (v13) и исполняется: в списке расширений
@@ -143,20 +167,33 @@ const PAGE = process.env.STAND_URL || 'http://host.docker.internal:8098'
   const plexInstalled = fresh.plugins.includes('plex-sync.js')
   console.log('plex-sync installed:', plexInstalled ? 'yes' : 'NO')
 
-  const ok = fresh.appready && healed.appready
-    && /\/topapi$/.test(healed.top_server_url || '')
-    && healed.protocol === 'http'
-    && /^https:\/\/ru2/.test(healed.torrserver_url || '')
-    && /\/topapi$/.test(afterWatchdog.top_server_url || '')
-    && /^https:\/\/ru2/.test(afterWatchdog.torrserver_url || '')
-    && loopLoads === 1 // одна ручная перезагрузка, без цикла
-    && String(reapplied.boot_ver || '') !== ''
-    && healed.menu_hidden > 0
-    && probe === 200
-    && topapi.some(u => u.startsWith('200 /topapi/top'))
-    && topapi.some(u => u.startsWith('200 /topapi/feed'))
-    && topapi.some(u => u.startsWith('200 /topapi/seasonvar'))
-    && plexInstalled
+  const okParts = {
+    appready: fresh.appready && healed.appready,
+    top_url: /\/topapi$/.test(healed.top_server_url || ''),
+    protocol: healed.protocol === 'http',
+    torr: /^https:\/\/ru2/.test(healed.torrserver_url || ''),
+    watchdog_top: /\/topapi$/.test(afterWatchdog.top_server_url || ''),
+    watchdog_torr: /^https:\/\/ru2/.test(afterWatchdog.torrserver_url || ''),
+    loads: loopLoads === 1,
+    boot_ver: String(reapplied.boot_ver || '') !== '',
+    menu: healed.menu_hidden > 0,
+    probe,
+    top: topapi.some(u => u.startsWith('200 /topapi/top')),
+    feed: topapi.some(u => u.startsWith('200 /topapi/feed')),
+    seasonvar: topapi.some(u => u.startsWith('200 /topapi/seasonvar')),
+    plex: plexInstalled,
+    parser_cfg: String(fresh.parser.use) === 'true' && String(fresh.parser.type) === 'jackett' && String(fresh.parser.url) === 'jac.red' && String(fresh.parser.url_two) === 'jacred.0x3654.com' && String(fresh.parser.use_link) === 'both',
+    parser_probe: /^\d+ results$/.test(parserProbe),
+  }
+  const ok = Object.entries(okParts).every(([, v]) => v)
+  console.log('checks:', JSON.stringify(okParts))
+    // второй парсер применён бутстрапом и живой (CORS+apikey+выдача)
+    && String(fresh.parser.use) === 'true'
+    && String(fresh.parser.type) === 'jackett'
+    && String(fresh.parser.url) === 'jac.red'
+    && String(fresh.parser.url_two) === 'jacred.0x3654.com'
+    && String(fresh.parser.use_link) === 'both'
+    && /^\d+ results$/.test(parserProbe)
 
   console.log(ok ? 'E2E STAND OK' : 'E2E STAND FAIL')
   await browser.close()
