@@ -564,6 +564,7 @@ func main() {
 	port := env("PORT", "8355")
 	log.Printf("tracker-top %s on :%s, nnm=%s rutor=%s seasonvar=%s ttl=%ds", rev, port, nnmBase, rutorBase, seasonvarBase, ttl)
 
+	egressInit()
 	loadDiskCache()
 
 	// автосохранение: раз в минуту, если были обновления

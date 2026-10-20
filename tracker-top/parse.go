@@ -68,7 +68,9 @@ func fetch(url string) (string, error) {
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept-Encoding", "identity")
 
-	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	// трекеры банят IP точечно — ходим через ротор каналов (прямые
+	// запросы + SOCKS-туннели с других VPS), забаненный канал остывает
+	resp, err := egressDo(req)
 	if err != nil {
 		return "", err
 	}
@@ -391,7 +393,7 @@ func fetchPost(u, form string) (string, error) {
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	resp, err := egressDo(req)
 	if err != nil {
 		return "", err
 	}

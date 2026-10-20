@@ -20,7 +20,6 @@ import (
 const jackettBase = "https://jac.red"
 const jackettKey = "1"
 
-var jackettClient = &http.Client{Timeout: 25 * time.Second}
 
 // дробилка на 429: публичный прокси банит пачками — после одного 429
 // минуту не ходим (найдёт фолбэк/кэш), вместо десятков заведомо мёртвых
@@ -71,8 +70,14 @@ func jackettFind(query, orig string) []Item {
 		}
 		req.Header.Set("User-Agent", userAgent)
 
-		resp, err := jackettClient.Do(req)
+		// через ротор: 429/403 от прокси помечает канал остыванием,
+		// следующий запрос выйдет с другого IP; глобальный минутный
+		// отбой — только когда канал один или все остыли
+		resp, err := egressDo(req)
 		if err != nil {
+			if jackettCooldown() {
+				return out // второй канал подряд в откое — не наседаем
+			}
 			log.Printf("jackett: %v", err)
 			continue
 		}
