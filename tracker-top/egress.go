@@ -131,9 +131,12 @@ func egressPick() *egressChannel {
 	return oldest
 }
 
-// egressDo — запрос через ротор; HTTP 403/429 (бан/лимит источника)
-// помечает КАНЕЛ остыванием — источник видит другой IP со следующего
-// запроса. Сетевые ошибки канала тоже остывание (туннель лёг).
+// egressDo — запрос через ротор. Канал остывает при 403 (IP-бан
+// источника — следующий запрос выйдет с другого IP) и сетевых сбоях
+// (туннель лёг). 429 канал НЕ банит: Jackett-прокси лимитирует по
+// общему apikey куба, не по IP — глобальный минутный отбой обрабатывает
+// вызывающий код, а ротор не должен замораживать канал для остальных
+// источников.
 func egressDo(req *http.Request) (*http.Response, error) {
 	ch := egressPick()
 
@@ -143,10 +146,10 @@ func egressDo(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode == 403 || resp.StatusCode == 429 {
+	if resp.StatusCode == 403 {
 		resp.Body.Close()
-		ch.ban(fmt.Sprintf("HTTP %d от %s", resp.StatusCode, req.Host))
-		return nil, fmt.Errorf("%s: HTTP %d (канал %s)", req.URL.Host, resp.StatusCode, ch.name)
+		ch.ban(fmt.Sprintf("HTTP 403 от %s", req.Host))
+		return nil, fmt.Errorf("%s: HTTP 403 (канал %s)", req.URL.Host, ch.name)
 	}
 
 	return resp, nil

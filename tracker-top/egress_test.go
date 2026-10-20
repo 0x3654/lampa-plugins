@@ -9,20 +9,18 @@ import (
 )
 
 func TestEgressRotatesOnBan(t *testing.T) {
-	// источник отдаёт 429 при обращении с первого «IP» (счётчик каналов:
-	// первый запрос — прямой, помечается баном), второй — 200
+	// источник отдаёт 403 на первый запрос (IP-бан), 200 — на второй;
+	// канал a ловит бан, канал b продолжает работать
 	var hits int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt32(&hits, 1) == 1 {
-			w.WriteHeader(429)
+			w.WriteHeader(403)
 			return
 		}
 		w.WriteHeader(200)
 	}))
 	defer srv.Close()
 
-	// два «канала» ротора: оба direct (для юнита важно поведение
-	// выбора/остывания, а не сам прокси)
 	egressChannels = []*egressChannel{
 		{name: "a", client: srv.Client(), cooldown: time.Minute},
 		{name: "b", client: srv.Client(), cooldown: time.Minute},
@@ -31,24 +29,50 @@ func TestEgressRotatesOnBan(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 
-	// первый запрос: канал a ловит 429 — ошибка и бан
 	if _, err := egressDo(req); err == nil {
-		t.Fatal("429 должен вернуть ошибку")
+		t.Fatal("403 должен вернуть ошибку")
 	}
 
 	egressMu.Lock()
 	banned := egressChannels[0].bannedUntil.After(time.Now())
 	egressMu.Unlock()
 	if !banned {
-		t.Fatal("канал a должен уйти в остывание после 429")
+		t.Fatal("канал a должен уйти в остывание после 403")
 	}
 
-	// второй запрос уходит через живой канал — 200
 	resp, err := egressDo(req)
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatalf("второй канал должен работать: %v", err)
 	}
 	resp.Body.Close()
+}
+
+func TestEgress429DoesNotBanChannel(t *testing.T) {
+	// 429 — лимит по ключу (Jackett), не по IP: канал не остывает,
+	// ответ возвращается вызывающему для глобальной обработки
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+	}))
+	defer srv.Close()
+
+	egressChannels = []*egressChannel{
+		{name: "only", client: srv.Client(), cooldown: time.Minute},
+	}
+	egressRR = 0
+
+	req, _ := http.NewRequest("GET", srv.URL, nil)
+	resp, err := egressDo(req)
+	if err != nil {
+		t.Fatalf("429 возвращается без ошибки ротора: %v", err)
+	}
+	resp.Body.Close()
+
+	egressMu.Lock()
+	banned := egressChannels[0].bannedUntil.After(time.Now())
+	egressMu.Unlock()
+	if banned {
+		t.Fatal("429 не должен банить канал")
+	}
 }
 
 func TestEgressCooldownGrows(t *testing.T) {
