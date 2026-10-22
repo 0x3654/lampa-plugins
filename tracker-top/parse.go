@@ -117,7 +117,7 @@ var (
 	rutRedRe   = regexp.MustCompile(`(?s)class="red"[^>]*>.*?(\d+)</span>`)
 	rutSizeRe  = regexp.MustCompile(`([\d.]+)&nbsp;(KB|MB|GB|TB)`)
 
-	yearRe    = regexp.MustCompile(`\((\d{4})`)
+	yearRe    = regexp.MustCompile(`[(\[](\d{4})`)
 	baseCutRe = regexp.MustCompile(`[(\[]`)
 	seasonRe  = regexp.MustCompile(`(?i)сезон|серии|\[s\d+\]|\d+х\d+`)
 
@@ -179,6 +179,19 @@ func parseTitle(t string) (ru, orig string, year int, season bool) {
 	}
 	if len(pp) > 1 {
 		orig = pp[len(pp)-1]
+	}
+
+	// JacRed кладёт между названием и описанием «Сезон: N / Серии: …»:
+	// «Глубина / Below / Сезон: 1 / Серии: 1-6 …» —.orig становился
+	// «Серии: 1-6 из 6» и матч по оригиналу рвался. Достаём оригинал
+	// до сезонных частей, а не последним куском
+	if len(pp) > 2 {
+		for i := 1; i < len(pp); i++ {
+			if strings.HasPrefix(pp[i], "Сезон") || strings.HasPrefix(pp[i], "Серии") {
+				orig = pp[i-1]
+				break
+			}
+		}
 	}
 
 	season = seasonRe.MatchString(t)
@@ -593,10 +606,17 @@ func findReleaseList2(query, orig string, year int, typ string, minq, voices str
 		tol = 6
 	}
 
-	// источник 1: Jackett-прокси jac.red — 8+ трекеров одним запросом
-	candidates := jackettFind(query, orig)
+	// источник 1: свой агрегатор JacRed (Torznab, инстансы ae2+micro
+	// покрывают 10+ трекеров с обходом Cloudflare) — парсер наш, ходит
+	// в трекеры сам, лампе/топу остаётся фильтрация
+	candidates := jacredFind(query, orig)
 
-	// источник 2 (фолбэк): собственный парсинг NNM+rutor
+	// источник 2: Jackett-прокси jac.red (публичный ключ куба, лимиты)
+	if len(candidates) == 0 {
+		candidates = jackettFind(query, orig)
+	}
+
+	// источник 3 (фолбэк): собственный парсинг NNM+rutor
 	if len(candidates) == 0 {
 		candidates = findItems(query)
 		if orig != "" && orig != query {

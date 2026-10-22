@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+    <channel>
+        <atom:link href="http://127.0.0.1:9117/api/v1/indexer/1/newznab" rel="self" type="application/rss+xml" />
+        <title>JacRed</title>
+        <description>Torznab API</description>
+        <link>http://127.0.0.1:9117/</link>
+        <language>en-us</language>
+        <category>search</category>
+        
+    <item>
+        <title>Глубина / Below / Сезон: 1 / Серии: 1-6 из 6 (Джейми Чайлдс) [2026, Канада, ужасы, триллер, драма, детектив, WEB-DL 1080p] Dub (Movie Dubbing) + Dub (Ukr) + Original + Sub (Rus, Eng, Chi, Heb, Ron, Ukr) | [Дубляж Movie Dubbing].rus</title>
+        <guid isPermaLink="false">35026fd970f3a42ced7ad39355188b9c6d3232be</guid>
+        <jackettindexer id="all">rutracker</jackettindexer>
+        <link>magnet:?xt=urn:btih:35026FD970F3A42CED7AD39355188B9C6D3232BE&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%201080p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Dub%20(</link>
+        <comments>https://rutracker.org/forum/viewtopic.php?t=6919725</comments>
+        <pubDate>Thu, 08 Oct 2026 07:11:00 GMT</pubDate>
+        <category>5000</category>
+        <size>12219181957</size>
+        <enclosure url="magnet:?xt=urn:btih:35026FD970F3A42CED7AD39355188B9C6D3232BE&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%201080p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Dub%20(" length="12219181957" type="application/x-bittorrent;x-scheme-handler/magnet" />
+        <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:35026FD970F3A42CED7AD39355188B9C6D3232BE&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%201080p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Dub%20(" />
+        <torznab:attr name="size" value="12219181957" />
+        <torznab:attr name="seeders" value="2083" />
+        <torznab:attr name="leechers" value="1006" />
+        <torznab:attr name="peers" value="3089" />
+        <torznab:attr name="infohash" value="35026fd970f3a42ced7ad39355188b9c6d3232be" />
+        <torznab:attr name="downloadvolumefactor" value="1" />
+        <torznab:attr name="uploadvolumefactor" value="1" />
+        <torznab:attr name="site" value="rutracker" />
+        <torznab:attr name="category" value="5000" />
+        <torznab:attr name="language" value="Russian" />
+        <torznab:attr name="language" value="Ukrainian" />
+        <torznab:attr name="lang" value="ru" />
+        <torznab:attr name="year" value="2026" />
+        <torznab:attr name="season" value="1" />
+    </item>
+    <item>
+        <title>Глубина / Below / Сезон: 1 / Серии: 1-6 из 6 (Джейми Чайлдс) [2026, Канада, ужасы, триллер, драма, детектив, WEB-DL 2160p, 4k, HDR10, Dolby Vision] [Hybrid] Dub (Movie Dubbing) + Dub (Ukr) + Original + Sub (Rus, Ukr, Eng) | [Дубляж Movie Dubbing].rus</title>
+        <guid isPermaLink="false">20adfbd5190d10d7b6a34ce61330e6cfae52ab9c</guid>
+        <jackettindexer id="all">rutracker</jackettindexer>
+        <link>magnet:?xt=urn:btih:20ADFBD5190D10D7B6A34CE61330E6CFAE52AB9C&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%202160p%2C%204k%2C%20HDR10%2C%20Dolby%20Vision%5D%20%5BH</link>
+        <comments>https://rutracker.org/forum/viewtopic.php?t=6919817</comments>
+        <pubDate>Thu, 08 Oct 2026 11:09:00 GMT</pubDate>
+        <category>5000</category>
+        <size>28711856373</size>
+        <enclosure url="magnet:?xt=urn:btih:20ADFBD5190D10D7B6A34CE61330E6CFAE52AB9C&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%202160p%2C%204k%2C%20HDR10%2C%20Dolby%20Vision%5D%20%5BH" length="28711856373" type="application/x-bittorrent;x-scheme-handler/magnet" />
+        <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:20ADFBD5190D10D7B6A34CE61330E6CFAE52AB9C&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%202160p%2C%204k%2C%20HDR10%2C%20Dolby%20Vision%5D%20%5BH" />
+        <torznab:attr name="size" value="28711856373" />
+        <torznab:attr name="seeders" value="166" />
+        <torznab:attr name="leechers" value="139" />
+        <torznab:attr name="peers" value="305" />
+        <torznab:attr name="infohash" value="20adfbd5190d10d7b6a34ce61330e6cfae52ab9c" />
+        <torznab:attr name="downloadvolumefactor" value="1" />
+        <torznab:attr name="uploadvolumefactor" value="1" />
+        <torznab:attr name="site" value="rutracker" />
+        <torznab:attr name="category" value="5000" />
+        <torznab:attr name="language" value="Russian" />
+        <torznab:attr name="language" value="Ukrainian" />
+        <torznab:attr name="lang" value="ru" />
+        <torznab:attr name="year" value="2026" />
+        <torznab:attr name="season" value="1" />
+    </item>
+    <item>
+        <title>Глубина / Below / Сезон: 1 / Серии: 1-6 из 6 (Джейми Чайлдс, Стивен Данн, Хелен Шейвер) [2026, Канада, Ужасы, триллер, драма, детектив, WEB-DLRip-AVC] Dub (Movie Dubbing) + Original (Eng) + Sub (Rus, Eng) | [Дубляж Movie Dubbing].rus</title>
+        <guid isPermaLink="false">8d46ccd70813c92f387c2c9bbcb9586f9d9b585b</guid>
+        <jackettindexer id="all">rutracker</jackettindexer>
+        <link>magnet:?xt=urn:btih:8D46CCD70813C92F387C2C9BBCB9586F9D9B585B&amp;tr=http%3A%2F%2Fbt2.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A3%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip-AVC%5D</link>
+        <comments>https://rutracker.org/forum/viewtopic.php?t=6920838</comments>
+        <pubDate>Sat, 10 Oct 2026 14:23:00 GMT</pubDate>
+        <category>5000</category>
+        <size>4337916968</size>
+        <enclosure url="magnet:?xt=urn:btih:8D46CCD70813C92F387C2C9BBCB9586F9D9B585B&amp;tr=http%3A%2F%2Fbt2.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A3%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip-AVC%5D" length="4337916968" type="application/x-bittorrent;x-scheme-handler/magnet" />
+        <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:8D46CCD70813C92F387C2C9BBCB9586F9D9B585B&amp;tr=http%3A%2F%2Fbt2.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A3%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip-AVC%5D" />
+        <torznab:attr name="size" value="4337916968" />
+        <torznab:attr name="seeders" value="91" />
+        <torznab:attr name="leechers" value="32" />
+        <torznab:attr name="peers" value="123" />
+        <torznab:attr name="infohash" value="8d46ccd70813c92f387c2c9bbcb9586f9d9b585b" />
+        <torznab:attr name="downloadvolumefactor" value="1" />
+        <torznab:attr name="uploadvolumefactor" value="1" />
+        <torznab:attr name="site" value="rutracker" />
+        <torznab:attr name="category" value="5000" />
+        <torznab:attr name="language" value="Russian" />
+        <torznab:attr name="lang" value="ru" />
+        <torznab:attr name="year" value="2026" />
+        <torznab:attr name="season" value="1" />
+    </item>
+    <item>
+        <title>Глубина / Below / Сезон: 1 / Серии: 1-6 из 6 (Джейми Чайлдс, Хелен Шейвер, Стивен Данн) [2026, Канада, Триллер, драма, детектив, WEB-DLRip] Dub (Movie Dubbing) | [Дубляж Movie Dubbing].rus</title>
+        <guid isPermaLink="false">a63e1075aafba4ca0997241e035aeae963b910e5</guid>
+        <jackettindexer id="all">rutracker</jackettindexer>
+        <link>magnet:?xt=urn:btih:A63E1075AAFBA4CA0997241E035AEAE963B910E5&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A2%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip%5D%20Dub%20(Movie</link>
+        <comments>https://rutracker.org/forum/viewtopic.php?t=6921904</comments>
+        <pubDate>Mon, 12 Oct 2026 14:26:00 GMT</pubDate>
+        <category>5000</category>
+        <size>3478923509</size>
+        <enclosure url="magnet:?xt=urn:btih:A63E1075AAFBA4CA0997241E035AEAE963B910E5&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A2%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip%5D%20Dub%20(Movie" length="3478923509" type="application/x-bittorrent;x-scheme-handler/magnet" />
+        <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:A63E1075AAFBA4CA0997241E035AEAE963B910E5&amp;tr=http%3A%2F%2Fbt.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81%2C%20%D0%A5%D0%B5%D0%BB%D0%B5%D0%BD%20%D0%A8%D0%B5%D0%B9%D0%B2%D0%B5%D1%80%2C%20%D0%A1%D1%82%D0%B8%D0%B2%D0%B5%D0%BD%20%D0%94%D0%B0%D0%BD%D0%BD)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D0%A2%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DLRip%5D%20Dub%20(Movie" />
+        <torznab:attr name="size" value="3478923509" />
+        <torznab:attr name="seeders" value="70" />
+        <torznab:attr name="leechers" value="30" />
+        <torznab:attr name="peers" value="100" />
+        <torznab:attr name="infohash" value="a63e1075aafba4ca0997241e035aeae963b910e5" />
+        <torznab:attr name="downloadvolumefactor" value="1" />
+        <torznab:attr name="uploadvolumefactor" value="1" />
+        <torznab:attr name="site" value="rutracker" />
+        <torznab:attr name="category" value="5000" />
+        <torznab:attr name="language" value="Russian" />
+        <torznab:attr name="lang" value="ru" />
+        <torznab:attr name="year" value="2026" />
+        <torznab:attr name="season" value="1" />
+    </item>
+    <item>
+        <title>Глубина / Below / Сезон: 1 / Серии: 1-6 из 6 (Джейми Чайлдс) [2026, Канада, ужасы, триллер, драма, детектив, WEB-DL 720p] Dub (Movie Dubbing) + Original + Sub Rus, Eng | [Дубляж Movie Dubbing].rus</title>
+        <guid isPermaLink="false">1d6eb1794b7fcaa634ca513e8b8bf88d93552039</guid>
+        <jackettindexer id="all">rutracker</jackettindexer>
+        <link>magnet:?xt=urn:btih:1D6EB1794B7FCAA634CA513E8B8BF88D93552039&amp;tr=http%3A%2F%2Fbt4.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%20720p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Origin</link>
+        <comments>https://rutracker.org/forum/viewtopic.php?t=6922734</comments>
+        <pubDate>Wed, 14 Oct 2026 14:51:00 GMT</pubDate>
+        <category>5000</category>
+        <size>5229122682</size>
+        <enclosure url="magnet:?xt=urn:btih:1D6EB1794B7FCAA634CA513E8B8BF88D93552039&amp;tr=http%3A%2F%2Fbt4.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%20720p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Origin" length="5229122682" type="application/x-bittorrent;x-scheme-handler/magnet" />
+        <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:1D6EB1794B7FCAA634CA513E8B8BF88D93552039&amp;tr=http%3A%2F%2Fbt4.t-ru.org%2Fann%3Fmagnet&amp;dn=%D0%93%D0%BB%D1%83%D0%B1%D0%B8%D0%BD%D0%B0%20%2F%20Below%20%2F%20%D0%A1%D0%B5%D0%B7%D0%BE%D0%BD%3A%201%20%2F%20%D0%A1%D0%B5%D1%80%D0%B8%D0%B8%3A%201-6%20%D0%B8%D0%B7%206%20(%D0%94%D0%B6%D0%B5%D0%B9%D0%BC%D0%B8%20%D0%A7%D0%B0%D0%B9%D0%BB%D0%B4%D1%81)%20%5B2026%2C%20%D0%9A%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0%2C%20%D1%83%D0%B6%D0%B0%D1%81%D1%8B%2C%20%D1%82%D1%80%D0%B8%D0%BB%D0%BB%D0%B5%D1%80%2C%20%D0%B4%D1%80%D0%B0%D0%BC%D0%B0%2C%20%D0%B4%D0%B5%D1%82%D0%B5%D0%BA%D1%82%D0%B8%D0%B2%2C%20WEB-DL%20720p%5D%20Dub%20(Movie%20Dubbing)%20%2B%20Origin" />
+        <torznab:attr name="size" value="5229122682" />
+        <torznab:attr name="seeders" value="37" />
+        <torznab:attr name="leechers" value="31" />
+        <torznab:attr name="peers" value="68" />
+        <torznab:attr name="infohash" value="1d6eb1794b7fcaa634ca513e8b8bf88d93552039" />
+        <torznab:attr name="downloadvolumefactor" value="1" />
+        <torznab:attr name="uploadvolumefactor" value="1" />
+        <torznab:attr name="site" value="rutracker" />
+        <torznab:attr name="category" value="5000" />
+        <torznab:attr name="language" value="Russian" />
+        <torznab:attr name="lang" value="ru" />
+        <torznab:attr name="year" value="2026" />
+        <torznab:attr name="season" value="1" />
+    </item>
+    </channel>
+</rss>

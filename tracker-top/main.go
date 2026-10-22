@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-const cacheVer = "v15" // версия логики фильтров: смена инвалидирует кэш на томе
+const cacheVer = "v16" // версия логики фильтров: смена инвалидирует кэш на томе
 
 var (
 	nnmBase   = env("NNM_BASE", "https://nnmclub.to")
@@ -565,6 +565,7 @@ func main() {
 	log.Printf("tracker-top %s on :%s, nnm=%s rutor=%s seasonvar=%s ttl=%ds", rev, port, nnmBase, rutorBase, seasonvarBase, ttl)
 
 	egressInit()
+	jacredInit()
 	loadDiskCache()
 
 	// автосохранение: раз в минуту, если были обновления
