@@ -788,3 +788,50 @@ func humanToBytes(num, unit string) int64 {
 	}
 	return int64(f * mult)
 }
+
+// findQuick — матч только по JacRed (один HTTP, ~1с): для сборки пулов,
+// где полный фолбэк-путь (Jackett + прямой парсинг) на старых тайтлах
+// рейтинговых вариантов тянул десятки секунд на карточку. Найденное
+// пишется в find-кэш — интерактивный поиск получит мгновенно
+func findQuick(query, orig string, year int, typ string) (Item, bool) {
+	tol := 0
+	if typ == "tv" {
+		tol = 6
+	}
+
+	candidates := jacredFind(query, orig)
+
+	nq, no := normName(query), normName(orig)
+
+	var best *Item
+	for i := range candidates {
+		it := candidates[i]
+		if it.Year == 0 || year == 0 || abs(it.Year-year) > tol {
+			continue
+		}
+		ruMatch := normName(it.Ru) == nq && (no == "" || it.Orig == "" || normName(it.Orig) == no)
+		origMatch := no != "" && normName(it.Orig) == no
+		if !ruMatch && !origMatch {
+			continue
+		}
+		if it.Seeders <= 0 {
+			continue
+		}
+		if best == nil || betterRelease(it, *best) {
+			cp := it
+			best = &cp
+		}
+	}
+
+	if best == nil {
+		return Item{}, false
+	}
+
+	// в кэш — с фильтрами по умолчанию (пул ищет без озвучечных
+	// фильтров юзера, как и раньше)
+	findCacheMu.Lock()
+	findCache[cacheVer+"|"+query+"|"+orig+"|"+strconv.Itoa(year)+"|"+typ+"|||truetrue"] = findCacheEntry{ts: time.Now(), item: *best, found: true}
+	findCacheMu.Unlock()
+
+	return *best, true
+}

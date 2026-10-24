@@ -525,7 +525,14 @@ func buildPool(variant string) ([]map[string]any, error) {
 
 			it, found := findInTopBase(query, orig, year, typ, "", "")
 			if !found {
-				it, found = findWithCache2(query, orig, year, typ, "", "", true, true)
+				// быстрый матч — только JacRed: полный фолбэк-путь
+				// (Jackett + прямой парсинг трекеров) на старых тайтлах
+				// рейтинговых пулов тянул десятки секунд на карточку, и 500
+				// карточек не собирались за сутки. Медленная цепочка остаётся
+				// интерактивному /findbatch (один тайтл — секунды приемлемы);
+				// результат всё равно пишется в find-кэш — найденное здесь
+				// findbatch получит мгновенно
+				it, found = findQuick(query, orig, year, typ)
 			}
 			if !found {
 				continue
