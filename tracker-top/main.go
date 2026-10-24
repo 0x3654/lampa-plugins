@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-const cacheVer = "v17" // версия логики фильтров: смена инвалидирует кэш на томе
+const cacheVer = "v18" // версия логики фильтров: смена инвалидирует кэш на томе
 
 var (
 	nnmBase   = env("NNM_BASE", "https://nnmclub.to")
@@ -368,7 +368,17 @@ func buildTopItems(src, cat string, pages int, junk bool, voices, ru, sort, anim
 		src = "nnm"
 	}
 
-	if src == "both" || src == "nnm" {
+	// «Популярное» — топ агрегатора JacRed по ВСЕМ трекерам (rutor, nnm,
+	// rutracker, kinozal…): агрегаты уже схлопнуты по тайтлу на его стороне.
+	// Прямой скрейп NNM+RUTOR остаётся фолбэком и путём «Классики» (o=6 —
+	// счётчик завершённых загрузок, которого в базе агрегатора нет)
+	if sort != "top" {
+		if topItems := jacredTop("sid"); len(topItems) > 0 {
+			items = topItems
+		}
+	}
+
+	if len(items) == 0 && (src == "both" || src == "nnm") {
 		nnmItems, err := nnmTop(cat, pages, nnmOrder)
 		if err != nil {
 			log.Printf("nnm: %v", err)
@@ -377,7 +387,7 @@ func buildTopItems(src, cat string, pages int, junk bool, voices, ru, sort, anim
 		items = append(items, nnmItems...)
 	}
 
-	if src == "both" || src == "rut" {
+	if len(items) == 0 && (src == "both" || src == "rut") {
 		rutItems, err := rutorTop(cat)
 		if err != nil {
 			log.Printf("rutor: %v", err)

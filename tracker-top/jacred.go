@@ -6,20 +6,31 @@ package main
 // Cloudflare и уже отдаёт magnet/сидов/год атрибутами.
 
 import (
+	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
 
 var (
-	jacredURL   = env("JACRED_URL", "http://127.0.0.1:9117/api/v1/indexer/1/newznab")
-	jacredKey   = env("JACRED_KEY", "")
-	jacredProxy = env("JACRED_PROXY", "socks5://172.17.0.1:3132") // канал ae2 в egress-роторе
+	jacredURL = env("JACRED_URL", "http://127.0.0.1:9117/api/v1/indexer/1/newznab")
+	jacredKey = env("JACRED_KEY", "")
+	// канал ae2 в egress-роторе; ЯВНО пустая переменная (JACRED_PROXY=) —
+	// без прокси: инстансы рядом с агрегатором ходят напрямую
+	jacredProxy = "socks5://172.17.0.1:3132"
 )
+
+func init() {
+	if v, ok := os.LookupEnv("JACRED_PROXY"); ok {
+		jacredProxy = v
+	}
+}
 
 var jacredClient *http.Client
 
@@ -194,3 +205,185 @@ func atoi64(s string) int64 {
 	return n
 }
 
+// ---------- нативный топ агрегатора: /api/v1.0/top (свой эндпоинт форка)
+
+// topTime — DateTime агрегатора приходит без зоны (Newtonsoft:
+// «2026-10-08T10:11:00»), Go ждёт RFC3339; парсим несколькими layout
+type topTime time.Time
+
+func (t *topTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		*t = topTime(time.Time{})
+		return nil
+	}
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05.9999999", "2006-01-02T15:04:05"} {
+		if v, err := time.Parse(layout, s); err == nil {
+			*t = topTime(v)
+			return nil
+		}
+	}
+	*t = topTime(time.Time{}) // битое время не роняет строку топа
+	return nil
+}
+
+// topRow — строка топа: агрегат всех раздач тайтла (шард masterDb),
+// лучшая раздача по сидам задаёт имя/год/качество/озвучку
+type topBest struct {
+	Tracker    string   `json:"tracker"`
+	URL        string   `json:"url"`
+	Magnet     string   `json:"magnet"`
+	Title      string   `json:"title"`
+	Sid        int      `json:"sid"`
+	Size       float64  `json:"size"`
+	SizeName   string   `json:"sizeName"`
+	Quality    int      `json:"quality"`
+	Videotype  string   `json:"videotype"`
+	Voices     []string `json:"voices"`
+	Seasons    []int    `json:"seasons"`
+	CreateTime topTime  `json:"createTime"`
+}
+
+type topRow struct {
+	Key          string   `json:"key"`
+	Name         string   `json:"name"`
+	Originalname string   `json:"originalname"`
+	Relased      int      `json:"relased"`
+	Type         string   `json:"type"`
+	MaxSid       int      `json:"maxSid"`
+	SumSid       int      `json:"sumSid"`
+	Releases     int      `json:"releases"`
+	Trackers     []string `json:"trackers"`
+	LastUpdate   topTime  `json:"lastUpdate"`
+	Best         *topBest `json:"best"`
+}
+
+type topResp struct {
+	UpdatedAt topTime  `json:"updatedAt"`
+	Count     int      `json:"count"`
+	Rows      []topRow `json:"rows"`
+}
+
+// qualityFromInt — quality у JacRed в пикселях высоты кадра (2160/1080/720…)
+func qualityFromInt(q int) string {
+	switch {
+	case q >= 2160:
+		return "2160"
+	case q >= 1080:
+		return "1080"
+	case q >= 720:
+		return "720"
+	}
+	return "sd"
+}
+
+// jacredBase — корень API из JACRED_URL (тот указывает на torznab-путь)
+func jacredBase() string {
+	if u, err := url.Parse(jacredURL); err == nil && u.Host != "" {
+		return u.Scheme + "://" + u.Host
+	}
+	return ""
+}
+
+// jacredTop — «Популярное»: топ агрегатора по всем трекерам.
+// sort: "sid" (по сидам) | "create" (новинки)
+func jacredTop(sort string) []Item {
+	if jacredClient == nil {
+		return nil
+	}
+
+	base := jacredBase()
+	if base == "" {
+		return nil
+	}
+
+	u := base + "/api/v1.0/top?take=1000"
+	if sort != "" {
+		u += "&sort=" + url.QueryEscape(sort)
+	}
+
+	// свой дедлайн: пересборка на стороне агрегатора может держать запрос
+	// дольше общего 20с-таймаута клиента поиска
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("X-Api-Key", jacredKey)
+
+	resp, err := jacredClient.Do(req)
+	if err != nil {
+		log.Printf("jacred-top: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("jacred-top: HTTP %d", resp.StatusCode)
+		return nil
+	}
+
+	var top topResp
+	if err := json.NewDecoder(resp.Body).Decode(&top); err != nil {
+		log.Printf("jacred-top: разбор: %v", err)
+		return nil
+	}
+
+	return topRowsToItems(top.Rows)
+}
+
+// topRowsToItems — строки топа → Item: флаги озвучки из канонических
+// voices агрегатора («Дубляж») плюс наши регулярки по названию раздачи
+func topRowsToItems(rows []topRow) []Item {
+	items := make([]Item, 0, len(rows))
+
+	for _, r := range rows {
+		if r.Best == nil || r.Name == "" {
+			continue
+		}
+		b := r.Best
+
+		it := Item{
+			Ru:       r.Name,
+			Orig:     r.Originalname,
+			Year:     r.Relased,
+			Season:   r.Type == "tv" || len(b.Seasons) > 0,
+			Title:    b.Title,
+			Seeders:  b.Sid,
+			Size:     int64(b.Size),
+			SizeText: b.SizeName,
+			URL:      b.URL,
+			Magnet:   b.Magnet,
+			Source:   "jacred:" + b.Tracker,
+			Quality:  qualityFromInt(b.Quality),
+			Dub:      dubRe.MatchString(b.Title),
+			TsSound:  tsRe.MatchString(b.Title),
+			Cam:      camRe.MatchString(b.Title),
+			Mvo:      mvoRe.MatchString(b.Title),
+			SubOnly:  subOnlyOf(b.Title),
+			Voice:    voiceOf(b.Title),
+		}
+
+		for _, v := range b.Voices {
+			if v == "Дубляж" {
+				it.Dub = true
+			}
+		}
+
+		// названия без явной озвучки (regex пусто): бейджем станет студия
+		if it.Voice == "" {
+			for _, v := range b.Voices {
+				if v != "" {
+					it.Voice = v
+					break
+				}
+			}
+		}
+
+		items = append(items, it)
+	}
+
+	return items
+}

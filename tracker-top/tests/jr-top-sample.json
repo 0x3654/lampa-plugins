@@ -1,0 +1,71 @@
+{
+  "updatedAt": "2026-10-24T19:12:03.1861741+03:00",
+  "count": 2,
+  "rows": [
+    {
+      "key": "глубина:below",
+      "name": "Глубина",
+      "originalname": "Below",
+      "relased": 2026,
+      "type": "movie",
+      "maxSid": 142,
+      "sumSid": 380,
+      "releases": 4,
+      "trackers": ["kinozal", "rutor"],
+      "lastUpdate": "2026-10-08T10:11:00",
+      "best": {
+        "tracker": "rutor",
+        "url": "https://rutor.info/torrent/123",
+        "magnet": "magnet:?xt=urn:btih:TEST1",
+        "title": "Глубина / Below (2026) WEB-DL 1080p | D",
+        "sid": 142,
+        "size": 8450000000,
+        "sizeName": "7.9 GB",
+        "quality": 1080,
+        "videotype": "WEB-DL",
+        "voices": ["Дубляж"],
+        "seasons": [],
+        "createTime": "2026-10-20T10:00:00Z"
+      }
+    },
+    {
+      "key": "побег из шоушенка:the shawshank redemption",
+      "name": "Побег из Шоушенка",
+      "originalname": "The Shawshank Redemption",
+      "relased": 1994,
+      "type": "tv",
+      "maxSid": 910,
+      "sumSid": 1200,
+      "releases": 2,
+      "trackers": ["rutracker"],
+      "lastUpdate": "2026-10-24T16:00:00Z",
+      "best": {
+        "tracker": "rutracker",
+        "url": "https://rutracker.org/forum/viewtopic.php?t=456",
+        "magnet": "magnet:?xt=urn:btih:TEST2",
+        "title": "Побег из Шоушенка / The Shawshank Redemption (1994) BDRip 720p",
+        "sid": 910,
+        "size": 4500000000,
+        "sizeName": "4.2 GB",
+        "quality": 720,
+        "videotype": "BDRip",
+        "voices": ["Гоблин"],
+        "seasons": [1],
+        "createTime": "2015-05-01T08:00:00Z"
+      }
+    },
+    {
+      "key": "битая строка",
+      "name": "Без раздачи",
+      "originalname": "",
+      "relased": 0,
+      "type": null,
+      "maxSid": 0,
+      "sumSid": 0,
+      "releases": 0,
+      "trackers": [],
+      "lastUpdate": "2026-10-24T16:00:00Z",
+      "best": null
+    }
+  ]
+}
