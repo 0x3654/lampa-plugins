@@ -763,8 +763,9 @@ func main() {
 		// досып — только когда страница ПУСТАЯ (или почти): пул варианта
 		// может быть короче slice после фильтров юзера (у трендов вселенная
 		// ~100), и требовать полных 100 — значит гнать медленную прямую
-		// сборку на каждый запрос с холодным кэшем комбинации фильтров
-		if err != nil || (page == 1 && len(results) < 20) {
+		// сборку на каждый запрос с холодным кэшем комбинации фильтров.
+		// Страницы 2+ — тоже: юзер листает глубже пула — досыпаем и там
+		if err != nil || len(results) < 20 && page == 1 || (len(results) == 0 && page > 1) {
 			// активный зритель исключил почти весь пул — досыпаем прямой
 			// сборкой глубже TMDB с тем же exclude
 			extra, total2, err2 := buildFeedCached(variant, page, feedSize*3,
@@ -798,6 +799,20 @@ func main() {
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return
+		}
+
+		// префетч глубины: юзер листает (страница 2+) — за ним тихо греем
+		// следующие две, чтобы переход был мгновенным; медленно и в фоне,
+		// кэш buildFeed уже тёплый после досыпа текущей страницы
+		if page >= 2 && page+2 <= 50 {
+			go func(p int, minq, voices string, junk, ru bool, exclude map[int]bool) {
+				time.Sleep(3 * time.Second) // не спорим с ответом юзеру
+				for _, np := range []int{p + 1, p + 2} {
+					buildFeedCached(variant, np, feedSize, minq, voices, junk, ru, exclude)
+					time.Sleep(5 * time.Second) // мягкий темп: трекеры не штурмуем
+				}
+			}(page, param(q, "minq", ""), param(q, "voice", ""),
+				param(q, "junk", "1") != "0", param(q, "ru", "1") != "0", exclude)
 		}
 
 		writeJSON(w, 200, map[string]any{
