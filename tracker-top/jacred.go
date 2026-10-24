@@ -297,14 +297,16 @@ func jacredTop(sort string) []Item {
 		return nil
 	}
 
-	u := base + "/api/v1.0/top?take=1000"
+	// 400 строк с запасом на листание (страница 20); меньше вес ответа —
+	// слабый VPS агрегатора отдаёт большой JSON десятки секунд
+	u := base + "/api/v1.0/top?take=400"
 	if sort != "" {
 		u += "&sort=" + url.QueryEscape(sort)
 	}
 
 	// свой дедлайн: пересборка на стороне агрегатора может держать запрос
 	// дольше общего 20с-таймаута клиента поиска
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
