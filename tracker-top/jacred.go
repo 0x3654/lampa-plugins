@@ -304,8 +304,9 @@ func jacredTop(sort string) []Item {
 		u += "&sort=" + url.QueryEscape(sort)
 	}
 
-	// свой дедлайн: пересборка на стороне агрегатора может держать запрос
-	// дольше общего 20с-таймаута клиента поиска
+	// свой клиент без общего Timeout (у клиента поиска он 20с и побеждает
+	// request-context): дедлайном топу служит только контекст запроса —
+	// пересборка на стороне агрегатора держит ответ десятки секунд
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -315,7 +316,7 @@ func jacredTop(sort string) []Item {
 	}
 	req.Header.Set("X-Api-Key", jacredKey)
 
-	resp, err := jacredClient.Do(req)
+	resp, err := (&http.Client{Transport: jacredClient.Transport}).Do(req)
 	if err != nil {
 		log.Printf("jacred-top: %v", err)
 		return nil
