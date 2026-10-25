@@ -151,6 +151,49 @@ var (
 	topUpBusy   = map[string]bool{}
 )
 
+// poolExtend — влить досчитанные (под фильтры юзера) карточки в пул варианта:
+// они прошли более строгий фильтр, значит валидны и для базового; пул растёт,
+// и страницы 2+ отдаются из него мгновенно
+func poolExtend(variant string, items []map[string]any) {
+	if len(items) == 0 {
+		return
+	}
+
+	poolMu.Lock()
+	e, ok := pools[variant]
+	if !ok {
+		poolMu.Unlock()
+		return // пул ещё строится — досып потерпит до его готовности
+	}
+
+	seen := map[float64]bool{}
+	for _, el := range e.results {
+		if id, ok := el["id"].(float64); ok {
+			seen[id] = true
+		}
+	}
+
+	// новый слайс, не append в общий: читатели (poolPage) держат старый
+	// срез — запись в общий backing array была бы гонкой
+	merged := make([]map[string]any, 0, len(e.results)+len(items))
+	merged = append(merged, e.results...)
+	added := 0
+	for _, el := range items {
+		if id, ok := el["id"].(float64); ok && !seen[id] {
+			seen[id] = true
+			merged = append(merged, el)
+			added++
+		}
+	}
+
+	if added > 0 {
+		e.results = merged
+		pools[variant] = e
+		diskDirty = true
+	}
+	poolMu.Unlock()
+}
+
 // warmFeedTopUp — фоновый досып (single-flight на комбинацию фильтров):
 // греет кэш buildFeedCached, следующий запрос страницы возьмёт его мгновенно;
 // запрос больше НИКОГДА не считает досып сам — иначе слабый VPS роняет ответ
@@ -170,9 +213,15 @@ func warmFeedTopUp(variant string, page, feedSize int, minq, voices string, junk
 		topUpBusyMu.Unlock()
 	}()
 
-	if _, _, err := buildFeedCached(variant, page, feedSize, minq, voices, junk, ru, exclude); err != nil {
+	results, _, err := buildFeedCached(variant, page, feedSize, minq, voices, junk, ru, exclude)
+	if err != nil {
 		log.Printf("feed topup %s p%d: %v", variant, page, err)
+		return
 	}
+
+	// досып посчитан под фильтры юзера — вливаем в пул: страница 2+ и другие
+	// клиенты с той же комбинацией получат её мгновенно из расширенного пула
+	poolExtend(variant, results)
 }
 
 func buildFeedCached(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) ([]map[string]any, int, error) {
@@ -351,7 +400,7 @@ type poolEntry struct {
 	results []map[string]any
 }
 
-const poolSize = 500 // глубокий пул: 100 на клиента после любых фильтров
+const poolSize = 750 // глубокий пул: клиентским фильтрам (1080+озвучка) оставляем запас
 const poolTTL = 12 * time.Hour
 
 // findInTopBase — матч по базе «Топ · трекеров» (прогрета warm-циклом):
@@ -528,12 +577,20 @@ func getPool(variant string) ([]map[string]any, error) {
 	return nil, errPoolBuilding
 }
 
-// buildPool — сборка: те же фильтры раздач, что и всегда (junk/ru, без
-// озвучек юзера — озвучечные фильтры узкие, их оставим на поиске, пул — базовый)
+// poolMinQ/poolVoices — постоянный профиль фильтров владельца (константа
+// деплоя, env POOL_MINQ/POOL_VOICES): пул собирается сразу под него, и
+// страницы с теми же фильтрами режутся из полного пула мгновенно, без
+// досыпа. Другие комбинации фильтров живут как раньше: срез пула + фоновый
+// досып
+var (
+	poolMinQ   = env("POOL_MINQ", "")
+	poolVoices = env("POOL_VOICES", "")
+)
+
+// buildPool — сборка: базовые фильтры раздач (junk/ru) + постоянный профиль
+// владельца (качество/озвучки), если задан
 func buildPool(variant string) ([]map[string]any, error) {
 
-	// сборка: те же фильтры раздач, что и всегда (junk/ru, без озвучек юзера —
-	// озвучечные фильтры узкие, их оставим на поиске, пул — базовый)
 	v, ok := tmdbVariants[variant]
 	if !ok {
 		return nil, fmt.Errorf("unknown variant")
@@ -581,7 +638,7 @@ func buildPool(variant string) ([]map[string]any, error) {
 				typ = "tv"
 			}
 
-			it, found := findInTopBase(query, orig, year, typ, "", "")
+			it, found := findInTopBase(query, orig, year, typ, poolMinQ, poolVoices)
 			if !found {
 				// быстрый матч — только JacRed: полный фолбэк-путь
 				// (Jackett + прямой парсинг трекеров) на старых тайтлах
@@ -591,6 +648,9 @@ func buildPool(variant string) ([]map[string]any, error) {
 				// результат всё равно пишется в find-кэш — найденное здесь
 				// findbatch получит мгновенно
 				it, found = findQuick(query, orig, year, typ)
+				if found && (qualityRank(it.Quality) < qualityRank(poolMinQ) || !voiceMatch(it, poolVoices)) {
+					found = false // профиль владельца строже быстрого матча
+				}
 			}
 			if !found {
 				continue

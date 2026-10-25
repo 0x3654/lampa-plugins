@@ -163,6 +163,23 @@ func filterVoice(items []Item, voices string) []Item {
 	return out
 }
 
+// voiceMatch — проходит ли раздача список озвучек (та же семантика,
+// что у filterVoice: имя, «Дубляж» по флагу Dub, «Многоголосый» по Mvo)
+func voiceMatch(it Item, voices string) bool {
+	if voices == "" {
+		return true
+	}
+	for _, v := range strings.Split(voices, ",") {
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+		if it.Voice == v || (v == "Дубляж" && it.Dub) || (v == "Многоголосый" && it.Mvo) {
+			return true
+		}
+	}
+	return false
+}
+
 func filterItems(items []Item, minq, audio string) []Item {
 	out := make([]Item, 0, len(items))
 	for _, it := range items {
