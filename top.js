@@ -1525,10 +1525,68 @@
             var tab  = svTabOf(object)
 
             // единые фильтры экранов: просмотренные/дубли не зависят от
-            // источника списка (репорт: «Яга» в списке, хоть и не проходит
-            // наши фильтры)
+            // источника списка; «Только с раздачами» — карточки без раздач
+            // под наши фильтры не показываются и здесь (репорт: «Яга»
+            // висела в списке при полном отсутствии раздач)
             hideWatched(comp)
             dedupeCards(comp)
+
+            // findbatch под общие фильтры; известные id идут из кеша батча,
+            // сервер дёргают только неизвестные
+            function applyTrackersOnly(results, done){
+                if(String(Lampa.Storage.field('top_trackers_only')) !== 'true' || !results.length){
+                    done(results)
+                    return
+                }
+
+                var base = serverUrl()
+
+                if(!base){
+                    done(results)
+                    return
+                }
+
+                var unknown = results.filter(function(el){
+                    return !batchFound.hasOwnProperty(el.id)
+                })
+
+                results = results.filter(function(el){
+                    return batchFound[el.id] !== false
+                })
+
+                if(!unknown.length){
+                    done(results)
+                    return
+                }
+
+                var payload = unknown.map(function(el){
+                    return {
+                        query: el.name || el.title || '',
+                        orig:  el.original_name || el.original_title || '',
+                        year:  parseInt(((el.first_air_date || el.release_date || '') + '').slice(0, 4), 10) || 0,
+                        type:  el.name ? 'tv' : 'movie'
+                    }
+                })
+
+                net.timeout(120000)
+
+                net.silent(base + '/findbatch?items=' + encodeURIComponent(JSON.stringify(payload)) + filtersParams(), function(r){
+                    if(r && r.found && r.found.length === unknown.length){
+                        unknown.forEach(function(el, i){
+                            batchFound[el.id] = r.found[i]
+                        })
+
+                        saveBatch()
+
+                        done(results.filter(function(el){
+                            return batchFound[el.id] !== false
+                        }))
+                    }
+                    else done(results)
+                }, function(){
+                    done(results) // сервер фильтра недоступен — список как есть
+                })
+            }
 
             // плашки: прогресс сезона «2/8» (или S2 — номер сезона), ✓ —
             // просмотрено по истории Lampa или целиком по seasonvar
@@ -1631,10 +1689,12 @@
                             results.push(el)
                         }
 
-                        svShown = results
+                        applyTrackersOnly(results, function(filtered){
+                            svShown = filtered
 
-                        if(!results.length) comp.empty()
-                        else comp.build({ results: results, total_pages: 1 })
+                            if(!filtered.length) comp.empty()
+                            else comp.build({ results: filtered, total_pages: 1 })
+                        })
                     })
                 }, function(a, b){
                     var why = ''
