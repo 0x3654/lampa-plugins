@@ -8,11 +8,11 @@
 package main
 
 import (
-	"net"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -772,16 +772,17 @@ func main() {
 		}
 		// досып — только когда страница ПУСТАЯ (или почти): пул варианта
 		// может быть короче slice после фильтров юзера (у трендов вселенная
-		// ~100), и требовать полных 100 — значит гнать медленную прямую
-		// сборку на каждый запрос с холодным кэшем комбинации фильтров.
-		// Страницы 2+ — тоже: юзер листает глубже пула — досыпаем и там
+		// ~100). Синхронный досып ЗАПРЕЩЁН: слабый VPS не успевает за
+		// таймауты (nginx 60с рвёт, клиент видит «нет подключения») —
+		// готовый досып из горячего кэша отдаём сразу, холодный греем фоном
+		// (warmFeedTopUp), страница дополнится следующим запросом
 		if err != nil || len(results) < 20 && page == 1 || (len(results) == 0 && page > 1) {
-			// активный зритель исключил почти весь пул — досыпаем прямой
-			// сборкой глубже TMDB с тем же exclude
-			extra, total2, err2 := buildFeedCached(variant, page, feedSize*3,
-				param(q, "minq", ""), param(q, "voice", ""),
-				param(q, "junk", "1") != "0", param(q, "ru", "1") != "0", exclude)
-			if err2 == nil {
+			minqF := param(q, "minq", "")
+			voicesF := param(q, "voice", "")
+			junkF := param(q, "junk", "1") != "0"
+			ruF := param(q, "ru", "1") != "0"
+
+			if extra, total2, ok2 := peekFeedCached(variant, page, feedSize*3, minqF, voicesF, junkF, ruF, exclude); ok2 {
 				// слить без дублей: пул + досып
 				seenIds := map[float64]bool{}
 				merged := make([]map[string]any, 0, feedSize*2)
@@ -798,12 +799,12 @@ func main() {
 					}
 				}
 				results = merged
-				if err2 == nil && total2 > total {
+				if total2 > total {
 					total = total2
 				}
 				total = (len(results) + feedSize - 1) / feedSize
-			} else if err != nil {
-				err = err2
+			} else {
+				go warmFeedTopUp(variant, page, feedSize*3, minqF, voicesF, junkF, ruF, exclude)
 			}
 		}
 		if err != nil {

@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -124,14 +124,59 @@ type feedResEntry struct {
 // buildFeed: страница из `pageSize` карточек, прошедших фильтры раздач —
 // сервер добирает TMDB-страницы, пока не наберёт (фильтрация больше
 // не съедает карточки, как было на клиенте)
-func buildFeedCached(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) ([]map[string]any, int, error) {
-	// ключ: вариант+страница+фильтры+отсортированный exclude
+// feedCacheKey — ключ кэша результатов досыпа: вариант+страница+фильтры+
+// отсортированный exclude
+func feedCacheKey(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) string {
 	ex := make([]string, 0, len(exclude))
 	for id := range exclude {
 		ex = append(ex, strconv.Itoa(id))
 	}
 	sort.Strings(ex)
-	key := fmt.Sprintf("%s|%d|%d|%s|%s|%v|%v|%s", variant, page, feedSize, minq, voices, junk, ru, strings.Join(ex, ","))
+	return fmt.Sprintf("%s|%d|%d|%s|%s|%v|%v|%s", variant, page, feedSize, minq, voices, junk, ru, strings.Join(ex, ","))
+}
+
+// peekFeedCached — готовый досып из горячего кэша без вычислений
+func peekFeedCached(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) ([]map[string]any, int, bool) {
+	key := feedCacheKey(variant, page, feedSize, minq, voices, junk, ru, exclude)
+	feedResMu.Lock()
+	defer feedResMu.Unlock()
+	if e, ok := feedRes[key]; ok && time.Since(e.ts) < 5*time.Minute {
+		return e.results, e.total, true
+	}
+	return nil, 0, false
+}
+
+var (
+	topUpBusyMu sync.Mutex
+	topUpBusy   = map[string]bool{}
+)
+
+// warmFeedTopUp — фоновый досып (single-flight на комбинацию фильтров):
+// греет кэш buildFeedCached, следующий запрос страницы возьмёт его мгновенно;
+// запрос больше НИКОГДА не считает досып сам — иначе слабый VPS роняет ответ
+// в 60с-таймаут nginx и клиент видит «нет подключения»
+func warmFeedTopUp(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) {
+	key := feedCacheKey(variant, page, feedSize, minq, voices, junk, ru, exclude)
+	topUpBusyMu.Lock()
+	if topUpBusy[key] {
+		topUpBusyMu.Unlock()
+		return
+	}
+	topUpBusy[key] = true
+	topUpBusyMu.Unlock()
+	defer func() {
+		topUpBusyMu.Lock()
+		delete(topUpBusy, key)
+		topUpBusyMu.Unlock()
+	}()
+
+	if _, _, err := buildFeedCached(variant, page, feedSize, minq, voices, junk, ru, exclude); err != nil {
+		log.Printf("feed topup %s p%d: %v", variant, page, err)
+	}
+}
+
+func buildFeedCached(variant string, page, feedSize int, minq, voices string, junk, ru bool, exclude map[int]bool) ([]map[string]any, int, error) {
+	key := feedCacheKey(variant, page, feedSize, minq, voices, junk, ru, exclude)
 
 	feedResMu.Lock()
 	if e, ok := feedRes[key]; ok && time.Since(e.ts) < 5*time.Minute {
@@ -429,12 +474,19 @@ var errPoolBuilding = errors.New("pool building")
 // синхронной сборке (nginx рвёт связь по 60с — 504)
 func getPool(variant string) ([]map[string]any, error) {
 	poolMu.Lock()
-	if e, ok := pools[variant]; ok && time.Since(e.ts) < poolTTL {
+	e, ok := pools[variant]
+	if ok && time.Since(e.ts) < poolTTL {
 		poolMu.Unlock()
 		return e.results, nil
 	}
 	if poolBusy[variant] {
+		// пересборка уже идёт: старый пул всё равно лучше сырых TMDB-карточек —
+		// каждая карточка пула гарантированно имеет раздачу под базовые фильтры,
+		// сырая же страница нарушает обещание «только с раздачами»
 		poolMu.Unlock()
+		if ok {
+			return e.results, nil
+		}
 		return nil, errPoolBuilding
 	}
 	poolBusy[variant] = true
@@ -467,6 +519,11 @@ func getPool(variant string) ([]map[string]any, error) {
 		poolMu.Unlock()
 	}()
 
+	// пересборка запущена фоном: прежний пул отдаём немедленно — свежесть
+	// топов не стоит минуты ожидания и сырых карточек у клиента
+	if ok {
+		return e.results, nil
+	}
 	return nil, errPoolBuilding
 }
 
