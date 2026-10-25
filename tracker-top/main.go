@@ -448,9 +448,16 @@ type diskFind struct {
 	TS    int64  `json:"ts"`
 }
 
+type diskPool struct {
+	Variant string           `json:"variant"`
+	Results []map[string]any `json:"results"`
+	TS      int64            `json:"ts"`
+}
+
 type diskCache struct {
-	Top  []diskTop  `json:"top"`
-	Find []diskFind `json:"find"`
+	Top   []diskTop  `json:"top"`
+	Find  []diskFind `json:"find"`
+	Pools []diskPool `json:"pools,omitempty"`
 }
 
 var diskDirty bool
@@ -471,6 +478,7 @@ func saveDiskCache() {
 
 	cacheMu.Lock()
 	findCacheMu.Lock()
+	poolMu.Lock()
 
 	var dc diskCache
 	for k, e := range cache {
@@ -479,7 +487,13 @@ func saveDiskCache() {
 	for k, e := range findCache {
 		dc.Find = append(dc.Find, diskFind{Key: k, Item: e.item, Found: e.found, TS: e.ts.Unix()})
 	}
+	// пулы переживают рестарт: без этого каждое обновление сервиса
+	// открывает окно сырых TMDB-страниц (карточки без раздач)
+	for v, e := range pools {
+		dc.Pools = append(dc.Pools, diskPool{Variant: v, Results: e.results, TS: e.ts.Unix()})
+	}
 
+	poolMu.Unlock()
 	findCacheMu.Unlock()
 	cacheMu.Unlock()
 
@@ -523,7 +537,13 @@ func loadDiskCache() {
 	}
 	findCacheMu.Unlock()
 
-	log.Printf("disk cache: %d топов, %d раздач", len(dc.Top), len(dc.Find))
+	poolMu.Lock()
+	for _, pl := range dc.Pools {
+		pools[pl.Variant] = poolEntry{ts: time.Unix(pl.TS, 0), results: pl.Results}
+	}
+	poolMu.Unlock()
+
+	log.Printf("disk cache: %d топов, %d раздач, %d пулов", len(dc.Top), len(dc.Find), len(dc.Pools))
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

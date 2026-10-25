@@ -517,6 +517,7 @@ func getPool(variant string) ([]map[string]any, error) {
 			pools = map[string]poolEntry{}
 		}
 		poolMu.Unlock()
+		diskDirty = true
 	}()
 
 	// пересборка запущена фоном: прежний пул отдаём немедленно — свежесть
